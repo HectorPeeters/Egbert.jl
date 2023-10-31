@@ -1,0 +1,13 @@
+name = "GpuOptim"
+uuid = "90cd4a59-3550-4b37-b31b-5de4fae66293"
+authors = ["Hector Peeters <hector.peeters@gmail.com>"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
