@@ -1,5 +1,5 @@
 using Core: OpaqueClosure, SSAValue
-using Core.Compiler: naive_idoms
+using Core.Compiler: naive_idoms, IRCode
 
 const global_ci_cache = CodeCache()
 
@@ -13,7 +13,13 @@ macro custom(ex)
         args = ($(esc(args))...,)
 
         ft = typeof(f)
-        types = typeof.(args)
+        types = map(args) do x
+            if x isa Symbol || x isa Expr
+                typeof(eval(x))
+            else
+                typeof(x)
+            end
+        end
         obj = custom_compiler(ft, types)
 
         obj(args...)
@@ -23,7 +29,6 @@ end
 function custom_compiler(ft, types)
     tt = Tuple{types...}
     sig = Tuple{ft,types...}
-
     world = Base.get_world_counter()
 
     interp = CustomInterpreter(world;
@@ -38,7 +43,7 @@ function custom_compiler(ft, types)
 
     show(interp.code_cache)
 
-    ir, ret = irs[1]
+    ir::IRCode, ret = irs[1]
 
     println(naive_idoms(ir.cfg.blocks))
 
@@ -59,7 +64,11 @@ function custom_compiler(ft, types)
                 # println("\tRewritten add_int to sub_int")
 
                 # Determine all argment expressions of this call
-                for arg in instruction.args[begin+1:end]
+                args = instruction.args[begin+1:end]
+                for arg in args
+                    if arg isa Symbol
+                        println("We have a symbol: ", arg)
+                    end
                     if arg isa SSAValue
                         arg_instr_stream = ir[arg]
                         arg_instr = arg_instr_stream.data.stmt[arg_instr_stream.idx]
