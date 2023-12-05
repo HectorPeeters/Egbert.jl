@@ -10,7 +10,7 @@ macro custom(ex)
     quote
         f = $(esc(f))
         @assert sizeof(f) == 0 "OpaqueClosures have different semantics wrt. captures, and cannot be used to implement closures with an environment"
-        args = ($(esc(args))...,)
+        args = ($(map(esc, args)...),)
 
         ft = typeof(f)
         types = map(args) do x
