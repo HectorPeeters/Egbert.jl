@@ -1,4 +1,3 @@
-
 struct CustomInterpreter <: CC.AbstractInterpreter
     world::UInt
 

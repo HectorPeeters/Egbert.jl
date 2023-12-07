@@ -1,36 +1,26 @@
-using Core.Compiler: naive_idoms, IRCode
+using Core.Compiler: naive_idoms, IRCode, Argument
+
+function is_call(instr, fname)
+    instr isa Expr || return false
+    instr.head == :call || return false
+    instr.args[begin] isa GlobalRef || return false
+    instr.args[begin].name == fname || return false
+    return true
+end
 
 function perform_rewrites(ir::IRCode, ci, sv)
-    println(naive_idoms(ir.cfg.blocks))
-
     println("IR before:\n", ir)
 
-    # Iterate over all instructions
     for instruction in ir.stmts.stmt
 
-        # Check if we have a call instruction
-        if instruction isa Expr && instruction.head == :call
+        if is_call(instruction, Symbol(Base.add_int))
+            args = instruction.args[begin+1:end]
+            @assert length(args) == 2
 
-            # Check if we have a call to Base.add_int
-            if instruction.args[begin] isa GlobalRef &&
-               instruction.args[begin].name == Symbol(Base.add_int)
-
-                # Rewrite Base.add_int to Base.sub_int
-                instruction.args[begin] = GlobalRef(Base, :sub_int)
-                println("\tRewritten add_int to sub_int")
-
-                # Determine all argment expressions of this call
-                args = instruction.args[begin+1:end]
-                for arg in args
-                    if arg isa Symbol
-                        println("We have a symbol: ", arg)
-                    end
-                    if arg isa SSAValue
-                        arg_instr_stream = ir[arg]
-                        arg_instr = arg_instr_stream.data.stmt[arg_instr_stream.idx]
-
-                        println("\tArgument ", arg.id, ": ", arg_instr)
-                    end
+            if args[1] isa Argument && args[2] isa Argument
+                if args[1].n == args[2].n 
+                    instruction.args[1] = GlobalRef(Base, :mul_int)
+                    instruction.args[3] = 2
                 end
             end
         end

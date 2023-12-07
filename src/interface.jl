@@ -40,7 +40,7 @@ function custom_compiler(ft, types)
         throw(MethodError(ft, tt, world))
     end
 
-    show(interp.code_cache)
+    # show(interp.code_cache)
 
     ir, ret = irs[1]
 
