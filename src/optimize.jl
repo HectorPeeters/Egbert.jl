@@ -1,4 +1,4 @@
-using Core.Compiler: naive_idoms, IRCode, Argument
+using .Core.Compiler: naive_idoms, IRCode, Argument
 
 function is_call(instr, fname)
     return instr isa Expr &&
@@ -7,8 +7,15 @@ function is_call(instr, fname)
            instr.args[begin].name == fname
 end
 
-function perform_rewrites(ir::IRCode, ci, sv)
-    for instruction in ir.stmts.stmt
+function perform_rewrites(ir::IRCode)
+    instructions =
+        @static if VERSION > v"1.10.0"
+            ir.stmts.stmt
+        else
+            ir.stmts.inst
+        end
+
+    for instruction in instructions
 
         if is_call(instruction, Symbol(Base.add_int))
             args = instruction.args[begin+1:end]
