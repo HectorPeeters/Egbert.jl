@@ -1,4 +1,4 @@
-using Core: MethodInstance, CodeInstance
+using .Core: MethodInstance, CodeInstance
 
 const CC = Core.Compiler
 

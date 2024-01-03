@@ -1,4 +1,4 @@
-using Core: OpaqueClosure, SSAValue
+using .Core: OpaqueClosure, SSAValue
 
 const global_ci_cache = CodeCache()
 
