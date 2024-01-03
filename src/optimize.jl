@@ -1,11 +1,10 @@
 using Core.Compiler: naive_idoms, IRCode, Argument
 
 function is_call(instr, fname)
-    instr isa Expr || return false
-    instr.head == :call || return false
-    instr.args[begin] isa GlobalRef || return false
-    instr.args[begin].name == fname || return false
-    return true
+    return instr isa Expr &&
+           instr.head == :call &&
+           instr.args[begin] isa GlobalRef &&
+           instr.args[begin].name == fname
 end
 
 function perform_rewrites(ir::IRCode, ci, sv)
