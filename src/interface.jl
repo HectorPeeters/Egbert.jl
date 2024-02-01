@@ -42,7 +42,9 @@ function custom_compiler(ft, types)
 
     # show(interp.code_cache)
 
-    ir, ret = irs[1]
+    ir, ret = only(irs)
+
+    ir = perform_rewrites(ir)
 
     OpaqueClosure(ir)
 end
