@@ -20,7 +20,7 @@ function mul(a::CustomList, b::CustomList)
 end
 
 function add_mul(a::CustomList, b::CustomList, c::CustomList)
-    a + b * c
+    CustomList(a.data .+ b.data .* c.data)
 end
 
 function optimizetarget(a, b, c)

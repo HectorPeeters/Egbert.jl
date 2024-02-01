@@ -31,13 +31,26 @@ function perform_rewrites(ir::IRCode)
             if arg2 isa SSAValue
                 instruction2 = instructions[arg2.id]
                 if is_invoke(instruction2, Symbol(:mul))
-                    println("Found add-mul invocation")
+                    println("Found add_mul invocation")
 
-                    println(instruction.args[begin])
+                    ltype = ir.stmts.type[arg2.id]
+
+                    m = first(methods(Main.add_mul, Tuple{ltype,ltype,ltype}))
+                    mi = Core.Compiler.specialize_method(m, Tuple{ltype,ltype,ltype,ltype}, Core.svec())
+
+                    instruction.head = :invoke
+                    instruction.args[begin] = mi
+                    instruction.args[2] = GlobalRef(Main, :add_mul)
+                    instruction.args[3] = arg1
+                    instruction.args[4] = instruction2.args[3]
+                    push!(instruction.args, instruction2.args[4])
+
+                    # instruction.head = :call
                     # instruction.args[begin] = GlobalRef(Main, :add_mul)
-                    # instruction.args[2] = GlobalRef(Main, :add_mul)
-                    # instruction.args[4] = instruction2.args[3]
-                    # push!(instruction.args, instruction2.args[4])
+                    # instruction.args[2] = arg1
+                    # instruction.args[3] = instruction2.args[3]
+                    # instruction.args[4] = instruction2.args[4]
+
                     println("Rewrote to add_mul")
                 end
             end
@@ -47,9 +60,9 @@ function perform_rewrites(ir::IRCode)
             args = instruction.args[begin+1:end]
             @assert length(args) == 2
 
-            if args[1] isa Argument && args[2] isa Argument
-                if args[1].n == args[2].n
-                    instruction.args[1] = GlobalRef(Base, :shl_int)
+            if args[begin] isa Argument && args[2] isa Argument
+                if args[begin].n == args[2].n
+                    instruction.args[begin] = GlobalRef(Base, :shl_int)
                     instruction.args[3] = 1
                     println("Performing rewrite on $(instruction)")
                 end
