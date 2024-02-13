@@ -28,6 +28,7 @@ CC.get_inference_cache(interp::CustomInterpreter) = interp.inf_cache
 CC.cache_owner(interp::CustomInterpreter) = nothing
 
 function logir(ir, ci, sv)
+    println("Function: ", sv.src.parent.def)
     println(ir)
     return ir
 end
@@ -50,7 +51,7 @@ function CC.build_opt_pipeline(interp::CustomInterpreter)
 
     CC.register_pass!(pm, "rewrite", (ir, ci, sv) -> perform_rewrites!(ir))
     CC.register_pass!(pm, "compact 3", (ir, ci, sv) -> CC.compact!(ir))
-    CC.register_pass!(pm, "log", logir)
+    # CC.register_pass!(pm, "log", logir)
 
     if CC.is_asserts() || true
         CC.register_pass!(pm, "verify 3", (ir, ci, sv) -> begin

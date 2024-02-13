@@ -1,5 +1,13 @@
 using .Core.Compiler: naive_idoms, IRCode, Argument
 
+@inline function instrs(ir)
+    @static if VERSION > v"1.10.0"
+        return ir.stmts.stmt
+    else
+        return ir.stmts.inst
+    end
+end
+
 function is_call(instr, fname)
     return Meta.isexpr(instr, :call) &&
            instr.args[begin] isa GlobalRef &&
@@ -12,15 +20,15 @@ function is_invoke(instr, name)
            instr.args[begin].def.name == name
 end
 
-function perform_rewrites!(ir::IRCode)
-    instructions =
-        @static if VERSION > v"1.10.0"
-            ir.stmts.stmt
-        else
-            ir.stmts.inst
-        end
+function markdead!(ir::IRCode, id)
+    instrs(ir)[id] = Main.nothing
+    ir.stmts.type[id] = Core.Const(nothing)
+end
 
-    for instruction in instructions
+function perform_rewrites!(ir::IRCode)
+    instructions = instrs(ir)
+
+    for (i, instruction) in enumerate(instructions)
         if is_invoke(instruction, Symbol(:add))
             println("Found add invocation")
             arg1 = instruction.args[3]
@@ -36,15 +44,9 @@ function perform_rewrites!(ir::IRCode)
                     m = first(methods(Main.add_mul, Tuple{ltype,ltype,ltype}))
                     mi = Core.Compiler.specialize_method(m, Tuple{ltype,ltype,ltype,ltype}, Core.svec())
 
-                    instruction.head = :invoke
-                    instruction.args[begin] = mi
-                    instruction.args[2] = Main.add_mul
-                    instruction.args[3] = arg1
-                    instruction.args[4] = instruction2.args[3]
-                    push!(instruction.args, instruction2.args[4])
+                    instructions[i] = Expr(:invoke, mi, Main.add_mul, arg1, instruction2.args[3], instruction2.args[4])
 
-                    instructions[arg2.id] = Main.nothing
-                    ir.stmts.type[arg2.id] = Core.Const(nothing)
+                    markdead!(ir, arg2.id)
 
                     println("Rewrote to add_mul")
                 end
