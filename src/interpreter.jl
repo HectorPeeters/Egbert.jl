@@ -27,6 +27,11 @@ CC.get_inference_world(interp::CustomInterpreter) = interp.world
 CC.get_inference_cache(interp::CustomInterpreter) = interp.inf_cache
 CC.cache_owner(interp::CustomInterpreter) = nothing
 
+function logir(ir, ci, sv)
+    println(ir)
+    return ir
+end
+
 function CC.build_opt_pipeline(interp::CustomInterpreter)
     pm = CC.PassManager()
 
@@ -35,17 +40,23 @@ function CC.build_opt_pipeline(interp::CustomInterpreter)
     CC.register_pass!(pm, "Inlining", (ir, ci, sv) -> CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds))
     CC.register_pass!(pm, "compact 2", (ir, ci, sv) -> CC.compact!(ir))
     CC.register_pass!(pm, "SROA", (ir, ci, sv) -> CC.sroa_pass!(ir, sv.inlining))
-    CC.register_pass!(pm, "ADCE", (ir, ci, sv) -> CC.adce_pass!(ir, sv.inlining) |> first)
+    CC.register_pass!(pm, "ADCE", (ir, ci, sv) -> begin
+        ir, made_changes = CC.adce_pass!(ir, sv.inlining)
+        if made_changes
+            ir = CC.compact!(ir, true)
+        end
+        return ir
+    end)
 
-    # TODO: only run when made_changes is true
-    CC.register_pass!(pm, "compact 3", (ir, ci, sv) -> CC.compact!(ir, true))
+    CC.register_pass!(pm, "rewrite", (ir, ci, sv) -> perform_rewrites!(ir))
+    CC.register_pass!(pm, "compact 3", (ir, ci, sv) -> CC.compact!(ir))
+    CC.register_pass!(pm, "log", logir)
 
-    CC.register_pass!(pm, "rewrite", (ir, ci, sv) -> perform_rewrites(ir))
-
-    if CC.is_asserts()
+    if CC.is_asserts() || true
         CC.register_pass!(pm, "verify 3", (ir, ci, sv) -> begin
             CC.verify_ir(ir, true, false, CC.optimizer_lattice(sv.inlining.interp))
             CC.verify_linetable(ir.linetable)
+            return ir
         end)
     end
 

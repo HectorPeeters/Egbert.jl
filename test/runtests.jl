@@ -24,6 +24,7 @@ function add_mul(a::CustomList, b::CustomList, c::CustomList)
 end
 
 function optimizetarget(a, b, c)
+    x = nothing
     return add(a, mul(b, c))
 end
 

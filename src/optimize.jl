@@ -12,15 +12,13 @@ function is_invoke(instr, name)
            instr.args[begin].def.name == name
 end
 
-function perform_rewrites(ir::IRCode)
+function perform_rewrites!(ir::IRCode)
     instructions =
         @static if VERSION > v"1.10.0"
             ir.stmts.stmt
         else
             ir.stmts.inst
         end
-
-    println(ir)
 
     for instruction in instructions
         if is_invoke(instruction, Symbol(:add))
@@ -40,16 +38,13 @@ function perform_rewrites(ir::IRCode)
 
                     instruction.head = :invoke
                     instruction.args[begin] = mi
-                    instruction.args[2] = GlobalRef(Main, :add_mul)
+                    instruction.args[2] = Main.add_mul
                     instruction.args[3] = arg1
                     instruction.args[4] = instruction2.args[3]
                     push!(instruction.args, instruction2.args[4])
 
-                    # instruction.head = :call
-                    # instruction.args[begin] = GlobalRef(Main, :add_mul)
-                    # instruction.args[2] = arg1
-                    # instruction.args[3] = instruction2.args[3]
-                    # instruction.args[4] = instruction2.args[4]
+                    instructions[arg2.id] = Main.nothing
+                    ir.stmts.type[arg2.id] = Core.Const(nothing)
 
                     println("Rewrote to add_mul")
                 end
@@ -69,8 +64,6 @@ function perform_rewrites(ir::IRCode)
             end
         end
     end
-
-    println(ir)
 
     return ir
 end
