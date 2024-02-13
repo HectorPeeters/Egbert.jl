@@ -44,7 +44,5 @@ function custom_compiler(ft, types)
 
     ir, ret = only(irs)
 
-    ir = perform_rewrites(ir)
-
     OpaqueClosure(ir)
 end
