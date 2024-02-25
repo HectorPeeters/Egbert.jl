@@ -8,19 +8,40 @@ using .Core.Compiler: naive_idoms, IRCode, Argument
     end
 end
 
+"""
+    is_call(instr, name)
+
+Check if an instruction is an call instruction with a
+specific name.
+"""
 function is_call(instr, fname)
     return Meta.isexpr(instr, :call) &&
            instr.args[begin] isa GlobalRef &&
            instr.args[begin].name == fname
 end
 
+"""
+    is_invoke(instr, name)
+
+Check if an instruction is an invoke instruction with a
+specific name.
+"""
 function is_invoke(instr, name)
     return Meta.isexpr(instr, :invoke) &&
            instr.args[begin].def.module == parentmodule(Module()) &&
            instr.args[begin].def.name == name
 end
 
+"""
+    markdead!(ir::IRCode, id)
+
+Mark an instruction as dead. It will be replaced by a load
+of a `nothing` value. This will then later be removed by the
+`compact` IR pass.
+"""
 function markdead!(ir::IRCode, id)
+    # TODO: This is still somewhat flawed, computation of arguments
+    #       for the removed call might not be necessary.
     instrs(ir)[id] = Main.nothing
     ir.stmts.type[id] = Core.Const(nothing)
 end
@@ -44,24 +65,17 @@ function perform_rewrites!(ir::IRCode)
                     m = first(methods(Main.add_mul, Tuple{ltype,ltype,ltype}))
                     mi = Core.Compiler.specialize_method(m, Tuple{ltype,ltype,ltype,ltype}, Core.svec())
 
-                    instructions[i] = Expr(:invoke, mi, Main.add_mul, arg1, instruction2.args[3], instruction2.args[4])
+                    instructions[i] = Expr(
+                        :invoke,
+                        mi,
+                        Main.add_mul,
+                        arg1,
+                        instruction2.args[3],
+                        instruction2.args[4])
 
                     markdead!(ir, arg2.id)
 
                     println("Rewrote to add_mul")
-                end
-            end
-        end
-
-        if is_call(instruction, Symbol(Base.add_int))
-            args = instruction.args[begin+1:end]
-            @assert length(args) == 2
-
-            if args[begin] isa Argument && args[2] isa Argument
-                if args[begin].n == args[2].n
-                    instruction.args[begin] = GlobalRef(Base, :shl_int)
-                    instruction.args[3] = 1
-                    println("Performing rewrite on $(instruction)")
                 end
             end
         end
