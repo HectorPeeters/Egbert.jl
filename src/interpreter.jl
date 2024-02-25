@@ -25,7 +25,7 @@ CC.InferenceParams(interp::CustomInterpreter) = interp.inf_params
 CC.OptimizationParams(interp::CustomInterpreter) = interp.opt_params
 CC.get_inference_world(interp::CustomInterpreter) = interp.world
 CC.get_inference_cache(interp::CustomInterpreter) = interp.inf_cache
-CC.cache_owner(interp::CustomInterpreter) = nothing
+CC.cache_owner(_::CustomInterpreter) = nothing
 
 function logir(ir, ci, sv)
     println("Function: ", sv.src.parent.def)
@@ -33,7 +33,7 @@ function logir(ir, ci, sv)
     return ir
 end
 
-function CC.build_opt_pipeline(interp::CustomInterpreter)
+function CC.build_opt_pipeline(_::CustomInterpreter)
     pm = CC.PassManager()
 
     CC.register_pass!(pm, "slot2reg", CC.slot2reg)
@@ -49,10 +49,13 @@ function CC.build_opt_pipeline(interp::CustomInterpreter)
         return ir
     end)
 
+    # Register the custom rewrite pass
     CC.register_pass!(pm, "rewrite", (ir, ci, sv) -> perform_rewrites!(ir))
+    # Compact afterwards to remove all dead code
     CC.register_pass!(pm, "compact 3", (ir, ci, sv) -> CC.compact!(ir))
-    # CC.register_pass!(pm, "log", logir)
+    CC.register_pass!(pm, "log", logir)
 
+    # TODO: remove || true
     if CC.is_asserts() || true
         CC.register_pass!(pm, "verify 3", (ir, ci, sv) -> begin
             CC.verify_ir(ir, true, false, CC.optimizer_lattice(sv.inlining.interp))
