@@ -19,7 +19,7 @@ macro rewritetarget(func::Expr)
     # inside of a `Base.compilerbarrier`.
     return esc(quote
         function $func_name($(args...))::$ret_type
-            return Base.compilerbarrier(:type, $(func))($(args...))
+            return Base.inferencebarrier($(func))($(args...))
         end
     end)
 end

@@ -49,20 +49,22 @@ end
 function perform_rewrites!(ir::IRCode)
     instructions = instrs(ir)
 
+    made_changes = false
+
     for (i, instruction) in enumerate(instructions)
         if is_invoke(instruction, Symbol(:add))
-            println("Found add invocation")
+            @info "Found add invocation"
             arg1 = instruction.args[3]
             arg2 = instruction.args[4]
 
             if arg2 isa SSAValue
                 instruction2 = instructions[arg2.id]
                 if is_invoke(instruction2, Symbol(:mul))
-                    println("Found add_mul invocation")
+                    @info "Found add_mul invocation"
 
                     ltype = ir.stmts.type[arg2.id]
 
-                    m = first(methods(Main.add_mul, Tuple{ltype,ltype,ltype}))
+                    m = methods(Main.add_mul, Tuple{ltype,ltype,ltype}) |> first
                     mi = Core.Compiler.specialize_method(m, Tuple{ltype,ltype,ltype,ltype}, Core.svec())
 
                     instructions[i] = Expr(
@@ -75,11 +77,13 @@ function perform_rewrites!(ir::IRCode)
 
                     markdead!(ir, arg2.id)
 
-                    println("Rewrote to add_mul")
+                    made_changes = true
+
+                    @info "Rewrote to add_mul"
                 end
             end
         end
     end
 
-    return ir
+    return ir, made_changes
 end
