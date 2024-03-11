@@ -54,41 +54,6 @@ function custom_compiler(ft, types)
         end
     end
 
-    # mis = copy(keys(interp.code_cache.dict))
-
-    # for (mi, cis) in interp.code_cache.dict
-    # println(mi)
-
-    # Crashes construct_ssa!
-    #
-    # codeinst = only(cis)
-    # ci = codeinst.inferred
-    # sv = CC.OptimizationState(mi, interp)
-    # i = CC.convert_to_ircode(ci, sv)
-    # pm = cleanup_opt_pipeline()
-    # i = CC.run_passes(pm, i, ci, sv)
-
-    # Loses type information
-    #
-    # sv = CC.OptimizationState(mi, interp)
-    # i = Core.Compiler.convert_to_ircode(sv.src, sv)
-    # pm = cleanup_opt_pipeline(interp)
-    # i = CC.run_passes(pm, i, ci, sv)
-
-    # result = InferenceResult(mi, Core.Compiler.typeinf_lattice(interp))
-    # frame = Core.Compiler.InferenceState(result, :global, interp)
-    # frame === nothing && continue
-    # Core.Compiler.typeinf(interp, frame)
-
-    # Core.Compiler.cache_result!(interp, frame.result)
-    # end
-
-    # for mi in mis
-    #     println(interp.code_cache.dict[mi])
-    # end
-
-    # show(interp.code_cache)
-
     @info "END"
 
     only(irs) |> first |> OpaqueClosure
