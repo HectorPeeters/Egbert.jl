@@ -53,17 +53,6 @@ function custom_compiler(ft, types)
         end
     end
 
-    # Switch the current pipeline from rewrite to cleanup
-    set_opt_pipeline!(interp, "final", final_opt_pipeline())
-
-    # Perform second optimization pass
-    for (_, caller) in interp.frame_cache
-        opt = caller.result.src
-        if opt isa OptimizationState
-            CC.optimize(caller.interp, opt, caller.result)
-        end
-    end
-
     # Finish optimization and cache result
     for (_, caller) in interp.frame_cache
         CC.finish!(caller.interp, caller)

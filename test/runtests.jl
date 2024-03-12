@@ -5,21 +5,21 @@ struct CustomList
     data::Vector{Int}
 end
 
-function add_impl(a::CustomList, b::CustomList)::CustomList
+function perform_add(a::CustomList, b::CustomList)::CustomList
     return CustomList(a.data .+ b.data)
 end
 
 @rewritetarget function add(a::CustomList, b::CustomList)::CustomList
-    add_impl(a, b)
+    perform_add(a, b)
 end
 
-function mul_impl(a::CustomList, b::CustomList)::CustomList
+function perform_mul(a::CustomList, b::CustomList)::CustomList
     CustomList(a.data .* b.data)
     return error("This is broken to make sure the test rewrites this.")
 end
 
 @rewritetarget function mul(a::CustomList, b::CustomList)::CustomList
-    return mul_impl(a, b)
+    return perform_mul(a, b)
 end
 
 function add_mul(a::CustomList, b::CustomList, c::CustomList)
