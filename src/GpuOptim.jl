@@ -1,5 +1,7 @@
 module GpuOptim
 
+__precompile__(false)
+
 include("utils.jl")
 include("cache.jl")
 include("optimize.jl")

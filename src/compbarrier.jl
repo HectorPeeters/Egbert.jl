@@ -89,7 +89,7 @@ function strip_compbarrier!(ir::IRCode)
 
             compbarrier_value = nothing
 
-            @debug "Stripped compilerbarrier"
+            @info "Stripped compilerbarrier"
         end
     end
 

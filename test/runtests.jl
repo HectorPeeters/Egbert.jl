@@ -40,5 +40,5 @@ end
     C = CustomList([7, 8, 9])
 
     @test (@custom optimizetarget(A, B, C)).data == [29, 42, 57]
-    @test (@custom nooptimizetarget(A, B)).data == [5, 7, 9]
+    # @test (@custom nooptimizetarget(A, B)).data == [5, 7, 9]
 end

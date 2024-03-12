@@ -9,8 +9,7 @@ mutable struct CustomInterpreter <: CC.AbstractInterpreter
     inf_params::CC.InferenceParams
     opt_params::CC.OptimizationParams
 
-    # TODO: this should probably be a set
-    frame_cache::Vector{CC.InferenceState}
+    frame_cache::IdDict{CC.MethodInstance,CC.InferenceState}
     opt_pipeline::CC.PassManager
 end
 
@@ -22,7 +21,7 @@ function CustomInterpreter(world::UInt;
 
     inf_cache = Vector{CC.InferenceResult}()
 
-    frame_cache = Vector{CC.InferenceState}()
+    frame_cache = IdDict{CC.MethodInstance,CC.InferenceState}()
     opt_pipeline = rewrite_opt_pipeline()
 
     return CustomInterpreter(
@@ -34,6 +33,11 @@ function CustomInterpreter(world::UInt;
         frame_cache,
         opt_pipeline
     )
+end
+
+function set_opt_pipeline!(interp::CustomInterpreter, name::String, pm::CC.PassManager)
+    @info string("Switching to pipeline '", name, "'")
+    interp.opt_pipeline = pm
 end
 
 CC.InferenceParams(interp::CustomInterpreter) = interp.inf_params
@@ -65,8 +69,6 @@ function CC.typeinf(interp::CustomInterpreter, frame::InferenceState)
     isempty(frames) && push!(frames, frame)
     valid_worlds = CC.WorldRange()
     for caller in frames
-        push!(interp.frame_cache, caller)
-
         @assert !(caller.dont_work_on_me)
         caller.dont_work_on_me = true
         # might might not fully intersect these earlier, so do that now
@@ -77,7 +79,13 @@ function CC.typeinf(interp::CustomInterpreter, frame::InferenceState)
         CC.finish(caller, caller.interp)
     end
 
+    # This allows the function executed with the `@custom` macro to be optimized
+    # as well
+    frame.result.src = OptimizationState(frame, interp)
+
     for caller in frames
+        interp.frame_cache[caller.result.linfo] = caller
+
         opt = caller.result.src
         if opt isa OptimizationState
             CC.optimize(caller.interp, opt, caller.result)

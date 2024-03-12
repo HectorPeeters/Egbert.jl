@@ -33,28 +33,51 @@ function custom_compiler(ft, types)
         inf_params=CC.InferenceParams(),
         opt_params=CC.OptimizationParams())
 
+    # Trigger the optimization pipeline
     irs = Base.code_ircode_by_type(sig; interp)
     isempty(irs) && throw(MethodError(ft, tt, world))
 
+    # Get the MethodInstance for the function we're optimizing
+    target_mi = ccall(:jl_method_lookup_by_tt, Any,
+        (Any, Csize_t, Any),
+        sig, world, nothing)
+
     # Switch the current pipeline from rewrite to cleanup
-    interp.opt_pipeline = cleanup_opt_pipeline()
+    set_opt_pipeline!(interp, "cleanup", cleanup_opt_pipeline())
 
     # Perform second optimization pass
-    for caller in interp.frame_cache
+    for (_, caller) in interp.frame_cache
         opt = caller.result.src
         if opt isa OptimizationState
             CC.optimize(caller.interp, opt, caller.result)
         end
     end
 
-    for caller in interp.frame_cache
+    # Switch the current pipeline from rewrite to cleanup
+    set_opt_pipeline!(interp, "final", final_opt_pipeline())
+
+    # Perform second optimization pass
+    for (_, caller) in interp.frame_cache
+        opt = caller.result.src
+        if opt isa OptimizationState
+            CC.optimize(caller.interp, opt, caller.result)
+        end
+    end
+
+    # Finish optimization and cache result
+    for (_, caller) in interp.frame_cache
         CC.finish!(caller.interp, caller)
         if CC.is_cached(caller)
             CC.cache_result!(caller.interp, caller.result)
         end
     end
 
+    # Extract the optimized implementation from the cache
+    frame = interp.frame_cache[target_mi]
+    ci = frame.result.src
+    ir = CC.inflate_ir!(ci, target_mi)
+
     @info "END"
 
-    only(irs) |> first |> OpaqueClosure
+    return OpaqueClosure(ir)
 end
