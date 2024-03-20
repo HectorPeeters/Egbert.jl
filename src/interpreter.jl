@@ -9,7 +9,7 @@ mutable struct CustomInterpreter <: CC.AbstractInterpreter
     inf_params::CC.InferenceParams
     opt_params::CC.OptimizationParams
 
-    frame_cache::IdDict{CC.MethodInstance,CC.InferenceState}
+    frame_cache::Vector{CC.InferenceState}
     opt_pipeline::CC.PassManager
 end
 
@@ -21,7 +21,7 @@ function CustomInterpreter(world::UInt;
 
     inf_cache = Vector{CC.InferenceResult}()
 
-    frame_cache = IdDict{CC.MethodInstance,CC.InferenceState}()
+    frame_cache = Vector{CC.InferenceState}()
     opt_pipeline = rewrite_opt_pipeline()
 
     return CustomInterpreter(
@@ -84,7 +84,7 @@ function CC.typeinf(interp::CustomInterpreter, frame::InferenceState)
     frame.result.src = OptimizationState(frame, interp)
 
     for caller in frames
-        interp.frame_cache[caller.result.linfo] = caller
+        push!(interp.frame_cache, caller)
 
         opt = caller.result.src
         if opt isa OptimizationState

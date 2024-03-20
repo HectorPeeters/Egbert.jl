@@ -46,7 +46,7 @@ function custom_compiler(ft, types)
     set_opt_pipeline!(interp, "cleanup", cleanup_opt_pipeline())
 
     # Perform second optimization pass
-    for (_, caller) in interp.frame_cache
+    for caller in interp.frame_cache
         opt = caller.result.src
         if opt isa OptimizationState
             CC.optimize(caller.interp, opt, caller.result)
@@ -54,7 +54,7 @@ function custom_compiler(ft, types)
     end
 
     # Finish optimization and cache result
-    for (_, caller) in interp.frame_cache
+    for caller in interp.frame_cache
         CC.finish!(caller.interp, caller)
         if CC.is_cached(caller)
             CC.cache_result!(caller.interp, caller.result)
@@ -62,7 +62,8 @@ function custom_compiler(ft, types)
     end
 
     # Extract the optimized implementation from the cache
-    frame = interp.frame_cache[target_mi]
+    frame_idx = findfirst(x -> x.result.linfo == target_mi, interp.frame_cache)
+    frame = interp.frame_cache[frame_idx]
     ci = frame.result.src
     ir = CC.inflate_ir!(ci, target_mi)
 

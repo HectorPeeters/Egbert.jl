@@ -10,7 +10,7 @@ function perform_add(a::CustomList, b::CustomList)::CustomList
 end
 
 @rewritetarget function add(a::CustomList, b::CustomList)::CustomList
-    perform_add(a, b)
+    return perform_add(a, b)
 end
 
 function perform_mul(a::CustomList, b::CustomList)::CustomList
