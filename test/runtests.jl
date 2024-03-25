@@ -26,13 +26,12 @@ function perform_add_mul(a::CustomList, b::CustomList, c::CustomList)
     return CustomList(a.data .+ b.data .* c.data)
 end
 
-function add_mul2(a::CustomList, b::CustomList, c::CustomList)
+function add_mul(a::CustomList, b::CustomList, c::CustomList)
     return perform_add_mul(a, b, c)
 end
 
-function add_mul(a::CustomList, b::CustomList, c::CustomList)
+@rewritetarget function add_mul_intermediate(a::CustomList, b::CustomList, c::CustomList)::CustomList
     return error("This is broken to make sure the test rewrites this.")
-    # return perform_add_mul(a, b, c)
 end
 
 function optimizetarget(a, b, c)

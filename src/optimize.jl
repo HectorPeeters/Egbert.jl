@@ -63,7 +63,7 @@ function perform_rewrites!(ir::IRCode)
 
                     ltype = ir.stmts.type[arg2.id]
 
-                    m = methods(Main.add_mul, Tuple{ltype,ltype,ltype}) |> first
+                    m = methods(Main.add_mul_intermediate, Tuple{ltype,ltype,ltype}) |> first
                     mi = Core.Compiler.specialize_method(m, Tuple{ltype,ltype,ltype,ltype}, Core.svec())
 
                     instructions[i] = Expr(
@@ -78,25 +78,25 @@ function perform_rewrites!(ir::IRCode)
 
                     made_changes = true
 
-                    @info "Rewrote to add_mul"
+                    @info "Rewrote to add_mul_intermediate"
                 end
             end
         end
 
-        if is_invoke(instruction, Symbol(:add_mul))
-            @info "Found add_mul invocation"
+        if is_invoke(instruction, Symbol(:add_mul_intermediate))
+            @info "Found add_mul_intermediate invocation"
 
             ltype = ir.stmts.type[1]
 
-            m = methods(Main.add_mul2, Tuple{ltype,ltype,ltype}) |> first
+            m = methods(Main.add_mul, Tuple{ltype,ltype,ltype}) |> first
             mi = Core.Compiler.specialize_method(m, Tuple{ltype,ltype,ltype,ltype}, Core.svec())
 
             instructions[i].args[1] = mi
-            instructions[i].args[2] = Main.add_mul2
+            instructions[i].args[2] = Main.add_mul
 
             made_changes = true
 
-            @info "Rewrote to add_mul2"
+            @info "Rewrote to add_mul"
         end
     end
 
