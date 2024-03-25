@@ -18,20 +18,22 @@ end
 
 pass_changed(x) = (x, true)
 
-function rewrite_opt_pipeline()
+function optimization_pipeline()
     pm = CC.PassManager()
 
+    # Perform initial conversion to IRCode
     CC.register_pass!(pm, "to ircode", (_, ci, sv) -> CC.convert_to_ircode(ci, sv) |> pass_changed)
     CC.register_pass!(pm, "slot2reg", (ir, ci, sv) -> CC.slot2reg(ir, ci, sv) |> pass_changed)
     CC.register_pass!(pm, "compact 1", (ir, _, _) -> CC.compact!(ir) |> pass_changed)
 
+    # Perform first pass of normal optimization pipeline
     CC.register_pass!(pm, "inlining", (ir, ci, sv) -> CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds) |> pass_changed)
     CC.register_pass!(pm, "compact 2", (ir, _, _) -> CC.compact!(ir) |> pass_changed)
-
     CC.register_pass!(pm, "SROA", (ir, _, sv) -> CC.sroa_pass!(ir, sv.inlining) |> pass_changed)
     CC.register_pass!(pm, "ADCE", (ir, _, sv) -> CC.adce_pass!(ir, sv.inlining))
     CC.register_condpass!(pm, "compact 3", (ir, _, _) -> CC.compact!(ir, true) |> pass_changed)
 
+    # Perform rewrite optimizations until fixedpoint is reached
     CC.register_fixedpointpass!(pm, "rewrite", function (ir, ci, sv)
         ir, changed = perform_rewrites!(ir)
         if changed
@@ -40,42 +42,18 @@ function rewrite_opt_pipeline()
         return ir, changed
     end)
 
+    # Perform second pass of normal optimization pipeline
     CC.register_pass!(pm, "inlining", (ir, ci, sv) -> CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds) |> pass_changed)
     CC.register_pass!(pm, "compact 2", (ir, _, _) -> CC.compact!(ir) |> pass_changed)
 
-    CC.register_pass!(pm, "log", logir)
-
-    # TODO: remove || true
-    if CC.is_asserts() || true
-        CC.register_pass!(pm, "verify", (ir, _, sv) -> begin
-            CC.verify_ir(ir, true, false, CC.optimizer_lattice(sv.inlining.interp))
-            CC.verify_linetable(ir.linetable)
-            return ir |> pass_changed
-        end)
-    end
-
-    return pm
-end
-
-function cleanup_opt_pipeline()
-    pm = CC.PassManager()
-
-    CC.register_pass!(pm, "to ircode", (_, _, sv) -> sv.ir |> pass_changed)
-
-    CC.register_pass!(pm, "strip compbarrier", (ir, _, _) -> strip_compbarrier!(ir))
-
-    # TODO: all these passes don't have to run if strip_compbarrier! did nothing
-    CC.register_condpass!(pm, "compact 1", (ir, _, _) -> CC.compact!(ir) |> pass_changed)
-    CC.register_pass!(pm, "inlining", (ir, ci, sv) -> CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds) |> pass_changed)
-    CC.register_pass!(pm, "compact 2", (ir, _, _) -> CC.compact!(ir) |> pass_changed)
     CC.register_pass!(pm, "SROA", (ir, _, sv) -> CC.sroa_pass!(ir, sv.inlining) |> pass_changed)
     CC.register_pass!(pm, "ADCE", (ir, _, sv) -> CC.adce_pass!(ir, sv.inlining))
     CC.register_condpass!(pm, "compact 3", (ir, _, _) -> CC.compact!(ir, true) |> pass_changed)
 
+    # Log the result of the optimizations
     CC.register_pass!(pm, "log", logir)
 
-    # TODO: remove || true
-    if CC.is_asserts() || true
+    if CC.is_asserts()
         CC.register_pass!(pm, "verify", (ir, _, sv) -> begin
             CC.verify_ir(ir, true, false, CC.optimizer_lattice(sv.inlining.interp))
             CC.verify_linetable(ir.linetable)

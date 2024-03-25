@@ -22,7 +22,7 @@ function CustomInterpreter(world::UInt;
     inf_cache = Vector{CC.InferenceResult}()
 
     frame_cache = Vector{CC.InferenceState}()
-    opt_pipeline = rewrite_opt_pipeline()
+    opt_pipeline = optimization_pipeline()
 
     return CustomInterpreter(
         world,
