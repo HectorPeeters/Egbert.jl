@@ -1,22 +1,28 @@
-function replace_compbarrier_calls!(ir::IRCode, _::CC.CodeInfo, _::CC.OptimizationState)
+function replace_compbarrier_calls!(ir::IRCode, interp::CustomInterpreter)
+    methods = []
+
+    for (mi, cis) in interp.code_cache.dict
+        for ci in cis
+            ci = ci.inferred
+
+            if ci.code[begin].head == :call &&
+                ci.code[begin].args[begin] == GlobalRef(Base, :compilerbarrier)
+                push!(methods, mi)
+                break
+            end
+        end
+    end
+
     instructions = instrs(ir)
 
     made_changes = false
 
-    symbols = [:add, :mul]
+    for instruction in instructions
+        for method in methods
+            if is_invoke(instruction, Symbol(method.def.name))        
+                impl_ref = GlobalRef(method.def.module, Symbol("impl_", method.def.name))
 
-    for (i, instruction) in enumerate(instructions)
-        for symbol in symbols
-            if is_invoke(instruction, Symbol(symbol))
-                params = instruction.args[begin].def.sig.parameters[begin+1:end]
-                ret_type = ir.stmts.type[i]
-        
-                impl_ref = GlobalRef(Main, Symbol("impl_", symbol))
-
-                m = methods(eval(impl_ref), params) |> first
-                mi = Core.Compiler.specialize_method(m, Tuple{params..., ret_type}, Core.svec())
-
-                instruction.args[1] = mi
+                instruction.args[1] = method
                 instruction.args[2] = impl_ref
 
                 made_changes = true
