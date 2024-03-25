@@ -14,7 +14,7 @@ end
 end
 
 function perform_mul(a::CustomList, b::CustomList)::CustomList
-    CustomList(a.data .* b.data)
+    # return CustomList(a.data .* b.data)
     return error("This is broken to make sure the test rewrites this.")
 end
 
@@ -22,8 +22,17 @@ end
     return perform_mul(a, b)
 end
 
-function add_mul(a::CustomList, b::CustomList, c::CustomList)
+function perform_add_mul(a::CustomList, b::CustomList, c::CustomList)
     return CustomList(a.data .+ b.data .* c.data)
+end
+
+function add_mul2(a::CustomList, b::CustomList, c::CustomList)
+    return perform_add_mul(a, b, c)
+end
+
+function add_mul(a::CustomList, b::CustomList, c::CustomList)
+    return error("This is broken to make sure the test rewrites this.")
+    # return perform_add_mul(a, b, c)
 end
 
 function optimizetarget(a, b, c)
