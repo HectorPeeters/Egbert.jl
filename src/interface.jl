@@ -2,7 +2,7 @@ using .Core: OpaqueClosure, SSAValue
 
 const global_ci_cache = CodeCache()
 
-macro custom(ex)
+macro custom(rules, ex::Expr)
     Meta.isexpr(ex, :call) || error("not a function call")
     f, args... = ex.args
 
@@ -13,13 +13,14 @@ macro custom(ex)
 
         ft = typeof(f)
         types = map(typeof, args)
-        obj = custom_compiler(ft, types)
+        rules::Vector{RewriteRule} = $(esc(rules))
+        obj = custom_compiler(ft, types, rules)
 
         obj(args...)
     end
 end
 
-function custom_compiler(ft, types)
+function custom_compiler(ft, types, rewrite_rules::Vector{RewriteRule})
     tt = Tuple{types...}
     sig = Tuple{ft,types...}
     world = Base.get_world_counter()
@@ -29,7 +30,8 @@ function custom_compiler(ft, types)
         #       for debugging. Afterwards, the global_ci_cache can be used.
         code_cache=CodeCache(),
         inf_params=CC.InferenceParams(),
-        opt_params=CC.OptimizationParams())
+        opt_params=CC.OptimizationParams(),
+        rewrite_rules=rewrite_rules)
 
     # Trigger the optimization pipeline
     irs = Base.code_ircode_by_type(sig; interp)

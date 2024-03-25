@@ -18,7 +18,7 @@ end
 
 pass_changed(x) = (x, true)
 
-function optimization_pipeline()
+function optimization_pipeline(interp)
     pm = CC.PassManager()
 
     # Perform initial conversion to IRCode
@@ -35,7 +35,7 @@ function optimization_pipeline()
 
     # Perform rewrite optimizations until fixedpoint is reached
     CC.register_fixedpointpass!(pm, "rewrite", function (ir, ci, sv)
-        ir, changed = perform_rewrites!(ir)
+        ir, changed = perform_rewrites!(ir, interp.rewrite_rules)
         if changed
             ir = CC.compact!(ir)
             ir = CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds)

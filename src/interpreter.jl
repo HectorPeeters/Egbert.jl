@@ -10,19 +10,22 @@ mutable struct CustomInterpreter <: CC.AbstractInterpreter
     opt_params::CC.OptimizationParams
 
     frame_cache::Vector{CC.InferenceState}
-    opt_pipeline::CC.PassManager
+    opt_pipeline::Function
+
+    rewrite_rules::Vector{RewriteRule}
 end
 
 function CustomInterpreter(world::UInt;
     code_cache::CodeCache,
     inf_params::CC.InferenceParams,
-    opt_params::CC.OptimizationParams)
+    opt_params::CC.OptimizationParams,
+    rewrite_rules::Vector{RewriteRule})
     @assert world <= Base.get_world_counter()
 
     inf_cache = Vector{CC.InferenceResult}()
 
     frame_cache = Vector{CC.InferenceState}()
-    opt_pipeline = optimization_pipeline()
+    opt_pipeline = optimization_pipeline
 
     return CustomInterpreter(
         world,
@@ -31,13 +34,9 @@ function CustomInterpreter(world::UInt;
         inf_params,
         opt_params,
         frame_cache,
-        opt_pipeline
+        opt_pipeline,
+        rewrite_rules
     )
-end
-
-function set_opt_pipeline!(interp::CustomInterpreter, name::String, pm::CC.PassManager)
-    @info string("Switching to pipeline '", name, "'")
-    interp.opt_pipeline = pm
 end
 
 CC.InferenceParams(interp::CustomInterpreter) = interp.inf_params
@@ -47,7 +46,7 @@ CC.get_inference_cache(interp::CustomInterpreter) = interp.inf_cache
 CC.code_cache(interp::CustomInterpreter) = WorldView(interp.code_cache, interp.world)
 CC.cache_owner(_::CustomInterpreter) = nothing
 
-CC.build_opt_pipeline(interp::CustomInterpreter) = interp.opt_pipeline
+CC.build_opt_pipeline(interp::CustomInterpreter) = interp.opt_pipeline(interp)
 
 CC.lock_mi_inference(::CustomInterpreter, ::MethodInstance) = nothing
 CC.unlock_mi_inference(::CustomInterpreter, ::MethodInstance) = nothing
