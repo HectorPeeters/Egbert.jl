@@ -45,7 +45,7 @@ function optimization_pipeline(interp)
     end)
 
     # Cleanup calls to compiler barrier functions
-    CC.register_pass!(pm, "cleanup", replace_compbarrier_calls!)
+    CC.register_pass!(pm, "cleanup", (ir, ci, sv) -> replace_compbarrier_calls!(ir, interp))
 
     # Perform second pass of normal optimization pipeline
     CC.register_pass!(pm, "inlining", (ir, ci, sv) -> CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds) |> pass_changed)

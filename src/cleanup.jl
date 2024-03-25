@@ -25,6 +25,8 @@ function replace_compbarrier_calls!(ir::IRCode, interp::CustomInterpreter)
                 instruction.args[1] = method
                 instruction.args[2] = impl_ref
 
+                @info "Cleaned up wrapper call `" * string(method.def.name) * "`` to `" * string(impl_ref.name) * "`"
+
                 made_changes = true
             end
         end
