@@ -1,3 +1,11 @@
+function get_impl_function_name(func_name)
+    if func_name isa Expr
+        return error("TODO: get the implementation function name for cases like `Base.:+`")
+    end
+
+    return Symbol("impl_", func_name)
+end
+
 macro rewritetarget(func::Expr)
     # If a return type isn't included in the function, the name of the function is nested 
     # one additional level. We need the return type to be explicitly stated as that
@@ -16,6 +24,7 @@ macro rewritetarget(func::Expr)
     ret_type = signature.args[2]
 
     # Change the name of the implementation function by appending `impl!_`
+    # func_name_impl = get_impl_function_name(func_name)
     func_name_impl = Symbol("impl_", func_name)
     func.args[begin].args[begin].args[begin] = func_name_impl
 
