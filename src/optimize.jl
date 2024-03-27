@@ -1,4 +1,6 @@
 using .Core.Compiler: naive_idoms, IRCode, Argument
+using Metatheory
+using Metatheory.EGraphs
 
 const RewriteRule = Function
 
@@ -53,8 +55,48 @@ function markdead!(ir::IRCode, id)
     ir.stmts.type[id] = Core.Const(nothing)
 end
 
+
+function EGraphs.egraph_reconstruct_expression(::Type{IRExpr}, op, args; metadata = nothing, exprhead = nothing)
+    IRExpr(op, args)
+end
+
 function perform_rewrites!(ir::IRCode, rewrite_rules::Vector{RewriteRule})
     instructions = instrs(ir)
+
+    # cfg = CC.compute_basic_blocks(instructions)
+
+    # println(ir)
+
+    # for (i, block) in enumerate(cfg.blocks)
+    #     @info "Processing block $i"
+
+    #     irexpr = ircode_to_irexpr(instructions, block.stmts)
+    #     # println(irexpr)
+
+    #     g = EGraph(irexpr)
+    #     settermtype!(g, IRExpr)
+
+    #     t = @theory a b c begin
+    #         add(a, mul(b, c)) --> add_mul(a, b, c)
+    #     end
+
+    #     saturate!(g, t)
+
+    #     result = extract!(g, astsize)
+    #     println(result)
+
+    #     optimized_instr = []
+    #     irexpr_to_ircode!(result, optimized_instr, block.stmts.start)
+        
+    #     size(optimized_instr) < size(block.stmts) || error("Rewrite rule did not reduce the size of the block")
+
+    #     println("Instructions ", optimized_instr)
+    #     for (i, instr) in enumerate(optimized_instr)
+    #         instructions[i + block.stmts.start] = instr
+    #     end
+
+    #     println(ir)
+    # end
 
     for (i, instruction) in enumerate(instructions)
         for rule in rewrite_rules

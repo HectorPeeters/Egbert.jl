@@ -26,9 +26,7 @@ function mul_trace_optimized(A::MyMatrix, B::MyMatrix)
     result = 0.0
 
     for i in 1:N
-        for j in 1:N
-            result += A.data[i, j] * B.data[j, i]
-        end
+        result += sum(A.data[i, :] .* B.data[:, i])
     end
 
     return result

@@ -6,9 +6,13 @@ function replace_compbarrier_calls!(ir::IRCode, interp::CustomInterpreter)
     for (mi, cis) in interp.code_cache.dict
         for ci in cis
             ci = ci.inferred
+            if ci isa Nothing
+                continue
+            end
 
             # Check if the method starts with a call to `Base.compilerbarrier`
-            if ci.code[begin].head == :call &&
+            if ci isa Expr &&
+                ci.code[begin].head == :call &&
                 ci.code[begin].args[begin] == GlobalRef(Base, :compilerbarrier)
                 push!(wrapper_methods, mi)
                 break

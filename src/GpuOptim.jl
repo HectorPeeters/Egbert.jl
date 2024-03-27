@@ -4,6 +4,7 @@ __precompile__(false)
 
 include("utils.jl")
 include("cache.jl")
+include("rewrite.jl")
 include("optimize.jl")
 include("compbarrier.jl")
 include("pipeline.jl")
