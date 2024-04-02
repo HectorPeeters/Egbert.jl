@@ -10,10 +10,12 @@ function replace_compbarrier_calls!(ir::IRCode, interp::CustomInterpreter)
                 continue
             end
 
+            first_instr = ci.code[begin]
+
             # Check if the method starts with a call to `Base.compilerbarrier`
-            if ci isa Expr &&
-                ci.code[begin].head == :call &&
-                ci.code[begin].args[begin] == GlobalRef(Base, :compilerbarrier)
+            if first_instr isa Expr &&
+               first_instr.head == :call &&
+               first_instr.args[begin] == GlobalRef(Base, :compilerbarrier)
                 push!(wrapper_methods, mi)
                 break
             end
@@ -40,7 +42,7 @@ function replace_compbarrier_calls!(ir::IRCode, interp::CustomInterpreter)
                 impl_ref = GlobalRef(method.def.module, impl_func_name)
 
                 m = methods(eval(impl_ref), params) |> first
-                mi = Core.Compiler.specialize_method(m, Tuple{ret_type, params...}, Core.svec())
+                mi = Core.Compiler.specialize_method(m, Tuple{ret_type,params...}, Core.svec())
 
                 # Replace the method instance and the 
                 instruction.args[1] = mi
