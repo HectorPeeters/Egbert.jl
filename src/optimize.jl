@@ -57,7 +57,7 @@ end
 
 
 function EGraphs.egraph_reconstruct_expression(::Type{IRExpr}, op, args; metadata=nothing, exprhead=nothing)
-    IRExpr(op, args)
+    IRExpr(op, args, metadata)
 end
 
 function perform_rewrites!(ir::IRCode, ci::CC.CodeInfo, rules::Any)
@@ -65,10 +65,7 @@ function perform_rewrites!(ir::IRCode, ci::CC.CodeInfo, rules::Any)
         return ir, false
     end
 
-    instructions = instrs(ir)
-    types = ir.stmts.type
-
-    cfg = CC.compute_basic_blocks(instructions)
+    cfg = CC.compute_basic_blocks(ir.stmts.stmt)
 
     if length(cfg.blocks) != 1
         @warn "Skipping function with multiple blocks: $(size(cfg.blocks))"
@@ -82,10 +79,10 @@ function perform_rewrites!(ir::IRCode, ci::CC.CodeInfo, rules::Any)
     for (i, block) in enumerate(cfg.blocks)
         @info "Processing block $i"
 
-        irtoexpr = IrToExpr(instructions, block.stmts)
+        irtoexpr = IrToExpr(ir.stmts.stmt, ir.stmts.type, block.stmts)
         irexpr = get_root_expr!(irtoexpr)
 
-        g = EGraph(irexpr)
+        g = EGraph(irexpr; keepmeta=true)
         settermtype!(g, IRExpr)
 
         saturate!(g, rules)
@@ -99,20 +96,30 @@ function perform_rewrites!(ir::IRCode, ci::CC.CodeInfo, rules::Any)
         made_changes = true
 
         exprtoir = ExprToIr(ci.parent.def.module, block.stmts)
-        optimized_instrs = expr_to_ir!(exprtoir, result)
+        (optim_instr, optim_types) = expr_to_ir!(exprtoir, result)
 
-        if length(optimized_instrs) > length(block.stmts)
-            error("New block is larger than old block: ", size(block.stmts), " -> ", size(optimized_instrs))
+        if length(optim_instr) > length(block.stmts)
+            # TODO: we need to resize in the middle of the instruction stream here
+            #       However, this case currently shouldn't be possible as we use the
+            #       astsize cost function.
+            error("New block is larger than old block: ", size(block.stmts), " -> ", size(optim_instr))
         end
 
-        for (i, instr) in enumerate(optimized_instrs)
-            instructions[i+block.stmts.start-1] = instr
+        for (i, instr) in enumerate(optim_instr)
+            ir.stmts.stmt[i+block.stmts.start-1] = instr
+            ir.stmts.type[i+block.stmts.start-1] = optim_types[i]
+            ir.stmts.info[i+block.stmts.start-1] = CC.NoCallInfo()
+            ir.stmts.flag[i+block.stmts.start-1] = CC.IR_FLAG_NULL
         end
 
-        for i in length(optimized_instrs)+block.stmts.start:length(block.stmts)
-            instructions[i] = nothing
-            types[i] = nothing
+        for i in length(optim_instr)+1:length(block.stmts)
+            ir.stmts.stmt[i+block.stmts.start-1] = nothing
+            ir.stmts.type[i+block.stmts.start-1] = Any
+            ir.stmts.info[i+block.stmts.start-1] = CC.NoCallInfo()
+            ir.stmts.flag[i+block.stmts.start-1] = CC.IR_FLAG_NULL
         end
+
+        println(ir)
     end
 
     return ir, made_changes

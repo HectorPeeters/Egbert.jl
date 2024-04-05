@@ -4,6 +4,7 @@ using Metatheory.EGraphs
 struct IRExpr
     head::Any
     args::Vector{Any}
+    type::Union{Nothing,Type}
 end
 
 function Base.:(==)(a::IRExpr, b::IRExpr)
@@ -14,9 +15,10 @@ TermInterface.istree(e::IRExpr) = true
 TermInterface.operation(e::IRExpr) = e.head
 TermInterface.exprhead(::IRExpr) = :call
 TermInterface.arguments(e::IRExpr) = e.args
+TermInterface.metadata(e::IRExpr) = (type = e.type)
 
 function TermInterface.similarterm(x::IRExpr, head, args; metadata=nothing, exprhead=:call)
-    IRExpr(head, args)
+    IRExpr(head, args, metadata)
 end
 
 # function EGraphs.egraph_reconstruct_expression(::Type{IRExpr}, op, args; metadata = nothing, exprhead = nothing)
@@ -25,11 +27,12 @@ end
 
 struct IrToExpr
     instructions::Vector{Any}
+    types::Vector{Any}
     range::CC.StmtRange
     converted::Vector{Bool}
     ssa_index::Integer
 
-    IrToExpr(instructions, range) = new(instructions, range, fill(false, length(instructions)), 1)
+    IrToExpr(instructions, types, range) = new(instructions, types, range, fill(false, length(instructions)), 1)
 end
 
 function markinstruction!(irtoexpr::IrToExpr, id::Integer)
@@ -47,11 +50,16 @@ function get_root_expr!(irtoexpr::IrToExpr)
 
         markinstruction!(irtoexpr, index)
 
-        instruction = irtoexpr.instructions[irtoexpr.range.start+index-1]
-        push!(toplevel_exprs, ir_to_expr!(irtoexpr, instruction))
+        instr_index = irtoexpr.range.start + index - 1
+        instruction = irtoexpr.instructions[instr_index]
+        type = irtoexpr.types[instr_index]
+
+        if instruction !== nothing
+            push!(toplevel_exprs, ir_to_expr!(irtoexpr, instruction, type))
+        end
     end
 
-    return IRExpr(:theta, reverse(toplevel_exprs))
+    return IRExpr(:theta, reverse(toplevel_exprs), nothing)
 end
 
 function ir_to_expr!(irtoexpr::IrToExpr, s::CC.SSAValue)
@@ -60,7 +68,7 @@ function ir_to_expr!(irtoexpr::IrToExpr, s::CC.SSAValue)
     end
 
     markinstruction!(irtoexpr, s.id)
-    return ir_to_expr!(irtoexpr, irtoexpr.instructions[s.id])
+    return ir_to_expr!(irtoexpr, irtoexpr.instructions[s.id], irtoexpr.types[s.id])
 end
 
 ir_to_expr!(_::IrToExpr, n::Nothing) = n
@@ -70,44 +78,51 @@ ir_to_expr!(_::IrToExpr, m::MethodInstance) = m
 ir_to_expr!(_::IrToExpr, r::GlobalRef) = r
 ir_to_expr!(_::IrToExpr, s::String) = s
 
-function ir_to_expr!(irtoexpr::IrToExpr, p::CC.PiNode)
-    return IRExpr(:pi, [ir_to_expr!(irtoexpr, p.val), p.typ])
+function ir_to_expr!(irtoexpr::IrToExpr, p::CC.PiNode, t)
+    return IRExpr(:pi, [ir_to_expr!(irtoexpr, p.val)], p.typ)
 end
 
-function ir_to_expr!(irtoexpr::IrToExpr, p::CC.PhiNode)
-    return IRExpr(:phi, [ir_to_expr!(irtoexpr, x) for x in p.values])
+function ir_to_expr!(irtoexpr::IrToExpr, p::CC.PhiNode, t)
+    # TODO: this nothing is probably incorrect
+    return IRExpr(:phi, [ir_to_expr!(irtoexpr, x) for x in p.values], t)
 end
 
-function ir_to_expr!(irtoexpr::IrToExpr, p::CC.GotoIfNot)
-    return IRExpr(:gotoifnot, [ir_to_expr!(irtoexpr, p.cond), p.dest])
+function ir_to_expr!(irtoexpr::IrToExpr, p::CC.GotoIfNot, t)
+    return IRExpr(:gotoifnot, [ir_to_expr!(irtoexpr, p.cond), p.dest], t)
 end
 
-function ir_to_expr!(_::IrToExpr, p::CC.GotoNode)
-    return IRExpr(:goto, [p.label])
+function ir_to_expr!(_::IrToExpr, p::CC.GotoNode, t)
+    return IRExpr(:goto, [p.label], t)
 end
 
-function ir_to_expr!(irtoexpr::IrToExpr, r::CC.ReturnNode)
-    return IRExpr(:ret, [ir_to_expr!(irtoexpr, r.val)])
+function ir_to_expr!(irtoexpr::IrToExpr, r::CC.ReturnNode, t)
+    return IRExpr(:ret, [ir_to_expr!(irtoexpr, r.val)], t)
 end
 
-function ir_to_expr!(irtoexpr::IrToExpr, e::Expr)
+function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
     if e.head == :invoke
         return IRExpr(Symbol(e.args[1].def.name), map(e.args[3:end]) do x
-            ir_to_expr!(irtoexpr, x)
-        end)
+                ir_to_expr!(irtoexpr, x)
+            end, t)
     end
 
     return IRExpr(e.head, map(e.args) do x
-        ir_to_expr!(irtoexpr, x)
-    end)
+            ir_to_expr!(irtoexpr, x)
+        end, t)
 end
 
 struct ExprToIr
     instructions::Vector{Any}
+    types::Vector{Type}
     ssa_start::Integer
     mod::Module
 
-    ExprToIr(mod::Module, range::CC.StmtRange) = new([], range.start, mod)
+    ExprToIr(mod::Module, range::CC.StmtRange) = new([], [], range.start, mod)
+end
+
+function push_instr!(exprtoir::ExprToIr, instr, type)
+    push!(exprtoir.instructions, instr)
+    push!(exprtoir.types, type)
 end
 
 expr_to_ir!(_::ExprToIr, a::CC.Argument) = a
@@ -119,12 +134,12 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
         for e in expr.args
             expr_to_ir!(exprtoir, e)
         end
-        return exprtoir.instructions
+        return (exprtoir.instructions, exprtoir.types)
     end
 
     if expr.head == :ret
         val = expr_to_ir!(exprtoir, expr.args[1])
-        push!(exprtoir.instructions, CC.ReturnNode(val))
+        push_instr!(exprtoir, CC.ReturnNode(val), expr.type)
         return
     end
 
@@ -134,7 +149,7 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
     end
 
     method = GlobalRef(exprtoir.mod, Symbol(func_name))
-    push!(exprtoir.instructions, Expr(:call, method, args...))
+    push_instr!(exprtoir, Expr(:call, method, args...), expr.type)
 
     return SSAValue(length(exprtoir.instructions) + exprtoir.ssa_start - 1)
 end
