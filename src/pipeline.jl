@@ -35,7 +35,7 @@ function optimization_pipeline(interp)
 
     # Perform rewrite optimizations until fixedpoint is reached
     CC.register_fixedpointpass!(pm, "rewrite", function (ir, ci, sv)
-        ir, changed = perform_rewrites!(ir, interp.rewrite_rules)
+        ir, changed = perform_rewrites!(ir, ci, interp.rewrite_rules)
         if changed
             ir = CC.compact!(ir)
             ir = CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds)

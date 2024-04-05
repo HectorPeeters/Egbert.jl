@@ -56,55 +56,69 @@ function markdead!(ir::IRCode, id)
 end
 
 
-function EGraphs.egraph_reconstruct_expression(::Type{IRExpr}, op, args; metadata = nothing, exprhead = nothing)
+function EGraphs.egraph_reconstruct_expression(::Type{IRExpr}, op, args; metadata=nothing, exprhead=nothing)
     IRExpr(op, args)
 end
 
-function perform_rewrites!(ir::IRCode, rewrite_rules::Vector{RewriteRule})
+function perform_rewrites!(ir::IRCode, ci::CC.CodeInfo, rewrite_rules::Vector{RewriteRule})
+    # TODO: remove this
+    if ci.parent.def.module != Main || ci.parent.def.name != :optimizetarget
+        return ir, false
+    end
+
     instructions = instrs(ir)
+    types = ir.stmts.type
 
-    # cfg = CC.compute_basic_blocks(instructions)
+    cfg = CC.compute_basic_blocks(instructions)
 
-    # println(ir)
+    if length(cfg.blocks) != 1
+        @warn "Skipping function with multiple blocks: $(size(cfg.blocks))"
+        return ir, false
+    end
 
-    # for (i, block) in enumerate(cfg.blocks)
-    #     @info "Processing block $i"
+    # TODO: setting the IR_FLAG_REFINED might result in better code analysis
 
-    #     irexpr = ircode_to_irexpr(instructions, block.stmts)
-    #     # println(irexpr)
+    made_changes = false
 
-    #     g = EGraph(irexpr)
-    #     settermtype!(g, IRExpr)
+    for (i, block) in enumerate(cfg.blocks)
+        @info "Processing block $i"
 
-    #     t = @theory a b c begin
-    #         add(a, mul(b, c)) --> add_mul(a, b, c)
-    #     end
+        irtoexpr = IrToExpr(instructions, block.stmts)
+        irexpr = get_root_expr!(irtoexpr)
 
-    #     saturate!(g, t)
+        g = EGraph(irexpr)
+        settermtype!(g, IRExpr)
 
-    #     result = extract!(g, astsize)
-    #     println(result)
+        t = @theory a b c begin
+            add(a, mul(b, c)) --> add_mul(a, b, c)
+        end
 
-    #     optimized_instr = []
-    #     irexpr_to_ircode!(result, optimized_instr, block.stmts.start)
-        
-    #     size(optimized_instr) < size(block.stmts) || error("Rewrite rule did not reduce the size of the block")
+        saturate!(g, t)
 
-    #     println("Instructions ", optimized_instr)
-    #     for (i, instr) in enumerate(optimized_instr)
-    #         instructions[i + block.stmts.start] = instr
-    #     end
+        result = extract!(g, astsize)
 
-    #     println(ir)
-    # end
+        if result == irexpr
+            continue
+        end
 
-    for (i, instruction) in enumerate(instructions)
-        for rule in rewrite_rules
-            if rule(ir, instructions, instruction, i)
-                return ir, true
-            end
+        made_changes = true
+
+        exprtoir = ExprToIr(ci.parent.def.module, block.stmts)
+        optimized_instrs = expr_to_ir!(exprtoir, result)
+
+        if length(optimized_instrs) > length(block.stmts)
+            error("New block is larger than old block: ", size(block.stmts), " -> ", size(optimized_instrs))
+        end
+
+        for (i, instr) in enumerate(optimized_instrs)
+            instructions[i+block.stmts.start-1] = instr
+        end
+
+        for i in length(optimized_instrs)+block.stmts.start:length(block.stmts)
+            instructions[i] = nothing
+            types[i] = nothing
         end
     end
 
-    return ir, false
+    return ir, made_changes
 end

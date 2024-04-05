@@ -15,7 +15,7 @@ TermInterface.operation(e::IRExpr) = e.head
 TermInterface.exprhead(::IRExpr) = :call
 TermInterface.arguments(e::IRExpr) = e.args
 
-function TermInterface.similarterm(x::IRExpr, head, args; metadata=nothing, exprhead = :call)
+function TermInterface.similarterm(x::IRExpr, head, args; metadata=nothing, exprhead=:call)
     IRExpr(head, args)
 end
 
@@ -23,81 +23,116 @@ end
 #   IRExpr(op, args, metadata)
 # end
 
-function ircode_to_irexpr(instructions, range::CC.StmtRange, s::CC.SSAValue)
-    if s.id < range.start || s.id > range.stop
+struct IrToExpr
+    instructions::Vector{Any}
+    range::CC.StmtRange
+    converted::Vector{Bool}
+    ssa_index::Integer
+
+    IrToExpr(instructions, range) = new(instructions, range, fill(false, length(instructions)), 1)
+end
+
+function markinstruction!(irtoexpr::IrToExpr, id::Integer)
+    irtoexpr.converted[id-irtoexpr.range.start+1] = true
+end
+
+function get_root_expr!(irtoexpr::IrToExpr)
+    toplevel_exprs = []
+
+    while true
+        index = findlast(x -> !x, irtoexpr.converted)
+        if index === nothing
+            break
+        end
+
+        markinstruction!(irtoexpr, index)
+
+        instruction = irtoexpr.instructions[irtoexpr.range.start+index-1]
+        push!(toplevel_exprs, ir_to_expr!(irtoexpr, instruction))
+    end
+
+    return IRExpr(:theta, toplevel_exprs)
+end
+
+function ir_to_expr!(irtoexpr::IrToExpr, s::CC.SSAValue)
+    if s.id < irtoexpr.range.start || s.id > irtoexpr.range.stop
         return s
     end
 
-    return ircode_to_irexpr(instructions, range, instructions[s.id])
+    markinstruction!(irtoexpr, s.id)
+    return ir_to_expr!(irtoexpr, irtoexpr.instructions[s.id])
 end
 
-ircode_to_irexpr(instructions, range::CC.StmtRange, a::CC.Argument) = a
-ircode_to_irexpr(instructions, range::CC.StmtRange, q::QuoteNode) = q
-ircode_to_irexpr(instructions, range::CC.StmtRange, m::MethodInstance) = m
-ircode_to_irexpr(instructions, range::CC.StmtRange, r::GlobalRef) = r
+ir_to_expr!(_::IrToExpr, n::Nothing) = n
+ir_to_expr!(_::IrToExpr, a::CC.Argument) = a
+ir_to_expr!(_::IrToExpr, q::QuoteNode) = q
+ir_to_expr!(_::IrToExpr, m::MethodInstance) = m
+ir_to_expr!(_::IrToExpr, r::GlobalRef) = r
 
-function ircode_to_irexpr(instructions, range::CC.StmtRange, p::CC.PiNode)
-    return IRExpr(:pi, [ircode_to_irexpr(instructions, range, p.val), p.typ])
+function ir_to_expr!(irtoexpr::IrToExpr, p::CC.PiNode)
+    return IRExpr(:pi, [ir_to_expr!(irtoexpr, p.val), p.typ])
 end
 
-function ircode_to_irexpr(instructions, range::CC.StmtRange, r::CC.ReturnNode)
-    return IRExpr(:return, [ircode_to_irexpr(instructions, range,r.val)])
+function ir_to_expr!(irtoexpr::IrToExpr, p::CC.PhiNode)
+    return IRExpr(:phi, [ir_to_expr!(irtoexpr, x) for x in p.values])
 end
 
-function ircode_to_irexpr(instructions, range::CC.StmtRange, e::Expr)
+function ir_to_expr!(irtoexpr::IrToExpr, p::CC.GotoIfNot)
+    return IRExpr(:gotoifnot, [ir_to_expr!(irtoexpr, p.cond), p.dest])
+end
+
+function ir_to_expr!(_::IrToExpr, p::CC.GotoNode)
+    return IRExpr(:goto, [p.label])
+end
+
+function ir_to_expr!(irtoexpr::IrToExpr, r::CC.ReturnNode)
+    return IRExpr(Symbol(:ret), [ir_to_expr!(irtoexpr, r.val)])
+end
+
+function ir_to_expr!(irtoexpr::IrToExpr, e::Expr)
     if e.head == :invoke
-        method = ircode_to_irexpr(instructions, range, e.args[2])
-        return IRExpr(method.name, map(e.args[3:end]) do x
-            return ircode_to_irexpr(instructions, range, x)
-        end)
-    elseif e.head == :call
-        method = eval(ircode_to_irexpr(instructions, range, e.args[1]))
-        return IRExpr(method, map(e.args[2:end]) do x
-            return ircode_to_irexpr(instructions, range, x)
+        return IRExpr(Symbol(e.args[1].def.name), map(e.args[3:end]) do x
+            ir_to_expr!(irtoexpr, x)
         end)
     end
 
     return IRExpr(e.head, map(e.args) do x
-        return ircode_to_irexpr(instructions, range, x)
+        ir_to_expr!(irtoexpr, x)
     end)
 end
 
-function ircode_to_irexpr(instructions, range::CC.StmtRange, idx::Integer)
-    return ircode_to_irexpr(instructions, range, instructions[idx])
+struct ExprToIr
+    instructions::Vector{Any}
+    ssa_start::Integer
+    mod::Module
+
+    ExprToIr(mod::Module, range::CC.StmtRange) = new([], range.start, mod)
 end
 
-function ircode_to_irexpr(instructions, range::CC.StmtRange)
-    return ircode_to_irexpr(instructions, range, instructions[range.stop])
-end
+expr_to_ir!(_::ExprToIr, a::CC.Argument) = a
+expr_to_ir!(_::ExprToIr, g::GlobalRef) = g
 
-function irexpr_to_ircode!(expr, instrs::Vector{Any}, ssa_index::Integer=0)
-    expr isa CC.Argument && return expr
-    expr isa CC.DataType && return expr
-    expr isa CC.QuoteNode && return expr
-    expr isa CC.GlobalRef && return expr
-    expr isa typeof(CC.compilerbarrier) && return expr
-    
-    if expr.head == :return
-        val = irexpr_to_ircode!(expr.args[1], instrs, ssa_index)
-        push!(instrs, CC.ReturnNode(val))
+function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
+    if expr.head == :theta
+        for e in expr.args
+            expr_to_ir!(exprtoir, e)
+        end
+        return exprtoir.instructions
+    end
+
+    if expr.head == :ret
+        val = expr_to_ir!(exprtoir, expr.args[1])
+        push!(exprtoir.instructions, CC.ReturnNode(val))
         return
     end
 
-    if expr.head == :pi
-        val = irexpr_to_ircode!(expr.args[1], instrs, ssa_index)
-        push!(instrs, CC.PiNode(val, expr.args[2]))
-        ssa_index+=1
-        return SSAValue(ssa_index)
+    func_name = expr.head
+    args = map(expr.args) do x
+        expr_to_ir!(exprtoir, x)
     end
 
-    method = irexpr_to_ircode!(expr.head, instrs, ssa_index)
+    method = GlobalRef(exprtoir.mod, Symbol(func_name))
+    push!(exprtoir.instructions, Expr(:call, method, args...))
 
-    mapped_args = []
-    for arg in expr.args
-        val = irexpr_to_ircode!(arg, instrs, ssa_index)
-        push!(mapped_args, val)
-    end
-
-    push!(instrs, Expr(:invoke, method, mapped_args...))
-    return SSAValue(ssa_index + 1)
+    return SSAValue(length(exprtoir.instructions) + exprtoir.ssa_start - 1)
 end
