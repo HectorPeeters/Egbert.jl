@@ -51,7 +51,7 @@ function get_root_expr!(irtoexpr::IrToExpr)
         push!(toplevel_exprs, ir_to_expr!(irtoexpr, instruction))
     end
 
-    return IRExpr(:theta, toplevel_exprs)
+    return IRExpr(:theta, reverse(toplevel_exprs))
 end
 
 function ir_to_expr!(irtoexpr::IrToExpr, s::CC.SSAValue)
@@ -68,6 +68,7 @@ ir_to_expr!(_::IrToExpr, a::CC.Argument) = a
 ir_to_expr!(_::IrToExpr, q::QuoteNode) = q
 ir_to_expr!(_::IrToExpr, m::MethodInstance) = m
 ir_to_expr!(_::IrToExpr, r::GlobalRef) = r
+ir_to_expr!(_::IrToExpr, s::String) = s
 
 function ir_to_expr!(irtoexpr::IrToExpr, p::CC.PiNode)
     return IRExpr(:pi, [ir_to_expr!(irtoexpr, p.val), p.typ])
@@ -86,7 +87,7 @@ function ir_to_expr!(_::IrToExpr, p::CC.GotoNode)
 end
 
 function ir_to_expr!(irtoexpr::IrToExpr, r::CC.ReturnNode)
-    return IRExpr(Symbol(:ret), [ir_to_expr!(irtoexpr, r.val)])
+    return IRExpr(:ret, [ir_to_expr!(irtoexpr, r.val)])
 end
 
 function ir_to_expr!(irtoexpr::IrToExpr, e::Expr)
@@ -111,6 +112,7 @@ end
 
 expr_to_ir!(_::ExprToIr, a::CC.Argument) = a
 expr_to_ir!(_::ExprToIr, g::GlobalRef) = g
+expr_to_ir!(_::ExprToIr, s::String) = s
 
 function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
     if expr.head == :theta
