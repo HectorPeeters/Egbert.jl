@@ -12,14 +12,14 @@ mutable struct CustomInterpreter <: CC.AbstractInterpreter
     frame_cache::Vector{CC.InferenceState}
     opt_pipeline::Function
 
-    rewrite_rules::Vector{RewriteRule}
+    rules::Any
 end
 
 function CustomInterpreter(world::UInt;
     code_cache::CodeCache,
     inf_params::CC.InferenceParams,
     opt_params::CC.OptimizationParams,
-    rewrite_rules::Vector{RewriteRule})
+    rules)
     @assert world <= Base.get_world_counter()
 
     inf_cache = Vector{CC.InferenceResult}()
@@ -35,7 +35,7 @@ function CustomInterpreter(world::UInt;
         opt_params,
         frame_cache,
         opt_pipeline,
-        rewrite_rules
+        rules
     )
 end
 

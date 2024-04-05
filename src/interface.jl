@@ -13,14 +13,14 @@ macro custom(rules, ex::Expr)
 
         ft = typeof(f)
         types = map(typeof, args)
-        rules::Vector{RewriteRule} = $(esc(rules))
+        rules = $(esc(rules))
         obj = custom_compiler(ft, types, rules)
 
         obj(args...)
     end
 end
 
-function custom_compiler(ft, types, rewrite_rules::Vector{RewriteRule})
+function custom_compiler(ft, types, rules::Any)
     tt = Tuple{types...}
     sig = Tuple{ft,types...}
     world = Base.get_world_counter()
@@ -31,7 +31,7 @@ function custom_compiler(ft, types, rewrite_rules::Vector{RewriteRule})
         code_cache=CodeCache(),
         inf_params=CC.InferenceParams(),
         opt_params=CC.OptimizationParams(),
-        rewrite_rules=rewrite_rules)
+        rules=rules)
 
     # Trigger the optimization pipeline
     irs = Base.code_ircode_by_type(sig; interp)

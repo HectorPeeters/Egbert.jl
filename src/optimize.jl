@@ -2,7 +2,7 @@ using .Core.Compiler: naive_idoms, IRCode, Argument
 using Metatheory
 using Metatheory.EGraphs
 
-const RewriteRule = Function
+const RewriteRule = Any
 
 """
     instrs(ir::IRCode)
@@ -60,9 +60,8 @@ function EGraphs.egraph_reconstruct_expression(::Type{IRExpr}, op, args; metadat
     IRExpr(op, args)
 end
 
-function perform_rewrites!(ir::IRCode, ci::CC.CodeInfo, rewrite_rules::Vector{RewriteRule})
-    # TODO: remove this
-    if ci.parent.def.module != Main || ci.parent.def.name != :optimizetarget
+function perform_rewrites!(ir::IRCode, ci::CC.CodeInfo, rules::Any)
+    if ci.parent.def.module != Main
         return ir, false
     end
 
@@ -89,11 +88,7 @@ function perform_rewrites!(ir::IRCode, ci::CC.CodeInfo, rewrite_rules::Vector{Re
         g = EGraph(irexpr)
         settermtype!(g, IRExpr)
 
-        t = @theory a b c begin
-            add(a, mul(b, c)) --> add_mul(a, b, c)
-        end
-
-        saturate!(g, t)
+        saturate!(g, rules)
 
         result = extract!(g, astsize)
 
