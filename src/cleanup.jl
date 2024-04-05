@@ -1,3 +1,15 @@
+"""
+    is_invoke(instr, name)
+
+Check if an instruction is an invoke instruction with a
+specific name.
+"""
+function is_invoke(instr, name)
+    return Meta.isexpr(instr, :invoke) &&
+           instr.args[begin].def.module == parentmodule(Module()) &&
+           instr.args[begin].def.name == name
+end
+
 function replace_compbarrier_calls!(ir::IRCode, interp::CustomInterpreter)
     # List of all compilerbarrier wrapper methods
     wrapper_methods = []
@@ -22,11 +34,9 @@ function replace_compbarrier_calls!(ir::IRCode, interp::CustomInterpreter)
         end
     end
 
-    instructions = instrs(ir)
-
     made_changes = false
 
-    for (i, instruction) in enumerate(instructions)
+    for (i, instruction) in enumerate(ir.stmts.stmt)
         for method in wrapper_methods
 
             # If we call one of the compilerbarrier wrapper methods, replace it with the actual method

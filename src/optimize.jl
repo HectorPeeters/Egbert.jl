@@ -4,58 +4,6 @@ using Metatheory.EGraphs
 
 const RewriteRule = Any
 
-"""
-    instrs(ir::IRCode)
-
-Get the instructions from an IRCode object.
-"""
-@inline function instrs(ir::IRCode)
-    @static if VERSION > v"1.10.0"
-        return ir.stmts.stmt
-    else
-        return ir.stmts.inst
-    end
-end
-
-"""
-    is_call(instr, name)
-
-Check if an instruction is an call instruction with a
-specific name.
-"""
-function is_call(instr, fname)
-    return Meta.isexpr(instr, :call) &&
-           instr.args[begin] isa GlobalRef &&
-           instr.args[begin].name == fname
-end
-
-"""
-    is_invoke(instr, name)
-
-Check if an instruction is an invoke instruction with a
-specific name.
-"""
-function is_invoke(instr, name)
-    return Meta.isexpr(instr, :invoke) &&
-           instr.args[begin].def.module == parentmodule(Module()) &&
-           instr.args[begin].def.name == name
-end
-
-"""
-    markdead!(ir::IRCode, id)
-
-Mark an instruction as dead. It will be replaced by a load
-of a `nothing` value. This will then later be removed by the
-`compact` IR pass.
-"""
-function markdead!(ir::IRCode, id)
-    # TODO: This is still somewhat flawed, computation of arguments
-    #       for the removed call might not be necessary.
-    instrs(ir)[id] = Main.nothing
-    ir.stmts.type[id] = Core.Const(nothing)
-end
-
-
 function EGraphs.egraph_reconstruct_expression(::Type{IRExpr}, op, args; metadata=nothing, exprhead=nothing)
     IRExpr(op, args, metadata)
 end
@@ -114,7 +62,7 @@ function perform_rewrites!(ir::IRCode, ci::CC.CodeInfo, rules::Any)
 
         for i in length(optim_instr)+1:length(block.stmts)
             ir.stmts.stmt[i+block.stmts.start-1] = nothing
-            ir.stmts.type[i+block.stmts.start-1] = Any
+            ir.stmts.type[i+block.stmts.start-1] = Nothing
             ir.stmts.info[i+block.stmts.start-1] = CC.NoCallInfo()
             ir.stmts.flag[i+block.stmts.start-1] = CC.IR_FLAG_NULL
         end

@@ -1,4 +1,4 @@
-using GpuOptim: @custom, @rewritetarget, is_invoke, markdead!
+using GpuOptim: @custom, @rewritetarget
 using Test: @testset, @test
 using LinearAlgebra: diag, sum
 using BenchmarkTools

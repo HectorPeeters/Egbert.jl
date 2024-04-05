@@ -46,13 +46,11 @@ end
 
 ## world view of the cache
 
-using Core.Compiler: WorldView
-
-function CC.haskey(wvc::WorldView{CodeCache}, mi::MethodInstance)
+function CC.haskey(wvc::CC.WorldView{CodeCache}, mi::MethodInstance)
     CC.get(wvc, mi, nothing) !== nothing
 end
 
-function CC.get(wvc::WorldView{CodeCache}, mi::MethodInstance, default)
+function CC.get(wvc::CC.WorldView{CodeCache}, mi::MethodInstance, default)
     # check the cache
     for ci in get!(wvc.cache.dict, mi, CodeInstance[])
         if ci.min_world <= wvc.worlds.min_world && wvc.worlds.max_world <= ci.max_world
@@ -70,13 +68,13 @@ function CC.get(wvc::WorldView{CodeCache}, mi::MethodInstance, default)
     return default
 end
 
-function CC.getindex(wvc::WorldView{CodeCache}, mi::MethodInstance)
+function CC.getindex(wvc::CC.WorldView{CodeCache}, mi::MethodInstance)
     r = CC.get(wvc, mi, nothing)
     r === nothing && throw(KeyError(mi))
     return r::CodeInstance
 end
 
-function CC.setindex!(wvc::WorldView{CodeCache}, ci::CodeInstance, mi::MethodInstance)
+function CC.setindex!(wvc::CC.WorldView{CodeCache}, ci::CodeInstance, mi::MethodInstance)
     src = if ci.inferred isa Vector{UInt8}
         ccall(:jl_uncompress_ir, Any, (Any, Ptr{Cvoid}, Any),
             mi.def, C_NULL, ci.inferred)
