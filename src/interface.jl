@@ -2,6 +2,12 @@ using .Core: OpaqueClosure, SSAValue
 
 const global_ci_cache = CodeCache()
 
+"""
+    custom(rules, ex::Expr)
+
+Execute a function call using the e-graph optimization pipeline.
+"""
+# TODO: this macro should get a better name
 macro custom(rules, ex::Expr)
     Meta.isexpr(ex, :call) || error("not a function call")
     f, args... = ex.args
@@ -20,15 +26,18 @@ macro custom(rules, ex::Expr)
     end
 end
 
+"""
+    custom_compiler(ft, types, rules)
+
+Compile a function using the e-graph optimization pipeline.
+"""
 function custom_compiler(ft, types, rules::Any)
     tt = Tuple{types...}
     sig = Tuple{ft,types...}
     world = Base.get_world_counter()
 
     interp = CustomInterpreter(world;
-        # NOTE: Lets use a new cache for every invocation, makes it easier 
-        #       for debugging. Afterwards, the global_ci_cache can be used.
-        code_cache=CodeCache(),
+        code_cache=global_ci_cache,
         inf_params=CC.InferenceParams(),
         opt_params=CC.OptimizationParams(),
         rules=rules)

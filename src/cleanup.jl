@@ -1,8 +1,7 @@
 """
     is_invoke(instr, name)
 
-Check if an instruction is an invoke instruction with a
-specific name.
+Check if an instruction is an invoke instruction with a specific name.
 """
 function is_invoke(instr, name)
     return Meta.isexpr(instr, :invoke) &&
@@ -10,6 +9,13 @@ function is_invoke(instr, name)
            instr.args[begin].def.name == name
 end
 
+"""
+    replace_compbarrier_calls!(ir::IRCode, interp::CustomInterpreter)
+
+Replace calls to compilerbarrier wrapper methods with the actual
+implementation. This removes the additional indirection in cases where
+@rewritetarget functions were not optimized.
+"""
 function replace_compbarrier_calls!(ir::IRCode, interp::CustomInterpreter)
     # List of all compilerbarrier wrapper methods
     wrapper_methods = []
@@ -34,6 +40,7 @@ function replace_compbarrier_calls!(ir::IRCode, interp::CustomInterpreter)
         end
     end
 
+    # Track if we made any changes to prevent unnecessary compact pass
     made_changes = false
 
     for (i, instruction) in enumerate(ir.stmts.stmt)

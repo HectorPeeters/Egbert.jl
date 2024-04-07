@@ -52,7 +52,7 @@ CC.lock_mi_inference(::CustomInterpreter, ::MethodInstance) = nothing
 CC.unlock_mi_inference(::CustomInterpreter, ::MethodInstance) = nothing
 
 function CC.add_remark!(::CustomInterpreter, sv::CC.InferenceState, msg)
-    @debug "Inference remark during GPU compilation of $(sv.linfo): $msg"
+    @debug "Inference remark during compilation of $(sv.linfo): $msg"
 end
 
 CC.may_optimize(interp::CustomInterpreter) = true

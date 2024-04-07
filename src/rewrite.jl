@@ -1,6 +1,13 @@
 using TermInterface
 using Metatheory.EGraphs
 
+"""
+    IRExpr
+
+This struct represents the tree structure of an IRCode object. It is used to
+perform e-graph optimizations on the IR code. The IRCode is converted to an
+IRExpr object, which is then converted back to IRCode after optimizations.
+"""
 struct IRExpr
     head::Any
     args::Vector{Any}
@@ -21,9 +28,13 @@ function TermInterface.similarterm(x::IRExpr, head, args; metadata=nothing, expr
     IRExpr(head, args, metadata)
 end
 
-# function EGraphs.egraph_reconstruct_expression(::Type{IRExpr}, op, args; metadata = nothing, exprhead = nothing)
-#   IRExpr(op, args, metadata)
-# end
+function EGraphs.egraph_reconstruct_expression(
+    ::Type{IRExpr}, op, args;
+    metadata=nothing,
+    exprhead=nothing
+)
+    IRExpr(op, args, metadata)
+end
 
 struct IrToExpr
     instructions::Vector{Any}
@@ -35,6 +46,13 @@ struct IrToExpr
     IrToExpr(instructions, types, range) = new(instructions, types, range, fill(false, length(instructions)), 1)
 end
 
+"""
+    markinstruction!(irtoexpr, id)
+
+Mark the instruction with the given ID as converted. This is used to make sure 
+all instructions are converted to an expression tree, not just the ones 
+necessary for the last return statement.
+"""
 function markinstruction!(irtoexpr::IrToExpr, id::Integer)
     irtoexpr.converted[id-irtoexpr.range.start+1] = true
 end
