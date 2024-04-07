@@ -29,8 +29,7 @@ function perform_rewrites!(ir::IRCode, ci::CC.CodeInfo, rules::Any)
 
     for (i, block) in enumerate(cfg.blocks)
         # Convert the IR block to an expression tree
-        irtoexpr = IrToExpr(ir.stmts.stmt, ir.stmts.type, block.stmts)
-        irexpr = get_root_expr!(irtoexpr)
+        irexpr = get_root_expr!(ir.stmts, block.stmts)
 
         # Create an e-graph from the expression tree
         g = EGraph(irexpr; keepmeta=true)

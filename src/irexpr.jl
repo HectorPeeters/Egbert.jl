@@ -39,25 +39,35 @@ end
 struct IrToExpr
     instructions::Vector{Any}
     types::Vector{Any}
+    flags::Vector{Any}
     range::CC.StmtRange
     converted::Vector{Bool}
     ssa_index::Integer
 
-    IrToExpr(instructions, types, range) = new(instructions, types, range, fill(false, length(instructions)), 1)
+    IrToExpr(instrs::CC.InstructionStream, range::CC.StmtRange) = new(
+        instrs.stmt,
+        instrs.type,
+        instrs.flag,
+        range,
+        fill(false, length(instrs.stmt)),
+        1
+    )
 end
 
 """
     markinstruction!(irtoexpr, id)
 
-Mark the instruction with the given ID as converted. This is used to make sure 
-all instructions are converted to an expression tree, not just the ones 
+Mark the instruction with the given ID as converted. This is used to make sure
+all instructions are converted to an expression tree, not just the ones
 necessary for the last return statement.
 """
 function markinstruction!(irtoexpr::IrToExpr, id::Integer)
     irtoexpr.converted[id-irtoexpr.range.start+1] = true
 end
 
-function get_root_expr!(irtoexpr::IrToExpr)
+function get_root_expr!(instrs::CC.InstructionStream, range)
+    irtoexpr = IrToExpr(instrs, range)
+
     toplevel_exprs = []
 
     while true
@@ -85,6 +95,7 @@ function ir_to_expr!(irtoexpr::IrToExpr, s::CC.SSAValue)
         return s
     end
 
+    # println(irtoexpr.flags[s.id], " ", irtoexpr.instructions[s.id])
     markinstruction!(irtoexpr, s.id)
     return ir_to_expr!(irtoexpr, irtoexpr.instructions[s.id], irtoexpr.types[s.id])
 end
