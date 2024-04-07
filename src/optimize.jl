@@ -20,8 +20,6 @@ function perform_rewrites!(ir::IRCode, ci::CC.CodeInfo, rules::Any)
         return ir, false
     end
 
-    # TODO: setting the IR_FLAG_REFINED might result in better code analysis
-
     made_changes = false
 
     for (i, block) in enumerate(cfg.blocks)
@@ -47,7 +45,7 @@ function perform_rewrites!(ir::IRCode, ci::CC.CodeInfo, rules::Any)
         (optim_instr, optim_types) = expr_to_ir!(exprtoir, result)
 
         if length(optim_instr) > length(block.stmts)
-            # TODO: we need to resize in the middle of the instruction stream here
+            # TODO: we need to resize in the middle of the instruction stream here.
             #       However, this case currently shouldn't be possible as we use the
             #       astsize cost function.
             error("New block is larger than old block: ", size(block.stmts), " -> ", size(optim_instr))
@@ -57,7 +55,7 @@ function perform_rewrites!(ir::IRCode, ci::CC.CodeInfo, rules::Any)
             ir.stmts.stmt[i+block.stmts.start-1] = instr
             ir.stmts.type[i+block.stmts.start-1] = optim_types[i]
             ir.stmts.info[i+block.stmts.start-1] = CC.NoCallInfo()
-            ir.stmts.flag[i+block.stmts.start-1] = CC.IR_FLAG_NULL
+            ir.stmts.flag[i+block.stmts.start-1] = CC.IR_FLAG_REFINED
         end
 
         for i in length(optim_instr)+1:length(block.stmts)
