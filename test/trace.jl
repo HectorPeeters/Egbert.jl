@@ -1,6 +1,6 @@
 using GpuOptim: @custom, @rewritetarget
 using Test: @testset, @test
-using LinearAlgebra: diag, sum
+using LinearAlgebra: diag, sum, transpose
 using BenchmarkTools
 using Metatheory
 
@@ -18,6 +18,10 @@ end
 
 @rewritetarget function mul(A::MyMatrix, B::MyMatrix)::MyMatrix
     return MyMatrix(A.data * B.data)
+end
+
+@rewritetarget function transp(A::MyMatrix)::MyMatrix
+    return MyMatrix(transpose(A.data))
 end
 
 function mul_trace_optimized(A::MyMatrix, B::MyMatrix)::Float64
@@ -42,7 +46,7 @@ A = MyMatrix(rand(N, N))
 B = MyMatrix(rand(N, N))
 
 function tooptimize(A::MyMatrix, B::MyMatrix)
-    return trace(mul(A, B))
+    return trace(transp(mul(A, B)))
 end
 
 function nooptimize1(A::MyMatrix)
@@ -54,14 +58,15 @@ function nooptimize2(A::MyMatrix, B::MyMatrix)
 end
 
 rules = @theory A B begin
+    trace(transp(A)) --> trace(A)
     trace(mul(A, B)) --> mul_trace_optimized(A, B)
 end
 
 @testset "TraceOfMatMul" begin
-    # @test isapprox(trace(mul(A, B)), mul_trace_optimized(A, B))
+    @test isapprox(trace(mul(A, B)), mul_trace_optimized(A, B))
 
-    # @test (@custom rules nooptimize1(A)) == trace(A)
-    # @test (@custom rules nooptimize2(A, B)) == mul(A, B)
+    @test (@custom rules nooptimize1(A)) == trace(A)
+    @test (@custom rules nooptimize2(A, B)) == mul(A, B)
 
     @test begin
         optimized = @custom rules tooptimize(A, B)
@@ -70,10 +75,11 @@ end
     end
 end
 
-# io = IOContext(stdout, :logbins=>true)
+io = IOContext(stdout, :logbins => true)
 
-# noopt = @benchmark tooptimize($A, $B)
-# show(io, MIME("text/plain"), noopt)
+noopt = @benchmark tooptimize($A, $B)
+show(io, MIME("text/plain"), noopt)
+println()
 
-# opt = @benchmark (@custom rules tooptimize($A, $B))
-# show(io, MIME("text/plain"), opt)
+opt = @benchmark (@custom rules tooptimize($A, $B))
+show(io, MIME("text/plain"), opt)
