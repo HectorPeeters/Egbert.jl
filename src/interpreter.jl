@@ -1,5 +1,13 @@
 using .Core.Compiler: OptimizationState, InferenceResult, InferenceState
 
+struct Options
+    use_cse::Bool
+
+    function Options(; use_cse::Bool=false)
+        new(use_cse)
+    end
+end
+
 mutable struct CustomInterpreter <: CC.AbstractInterpreter
     world::UInt
 
@@ -13,30 +21,38 @@ mutable struct CustomInterpreter <: CC.AbstractInterpreter
     opt_pipeline::Function
 
     rules::Any
-end
+    options::Options
 
-function CustomInterpreter(world::UInt;
-    code_cache::CodeCache,
-    inf_params::CC.InferenceParams,
-    opt_params::CC.OptimizationParams,
-    rules)
-    @assert world <= Base.get_world_counter()
+    function CustomInterpreter(world::UInt;
+        code_cache::CodeCache,
+        inf_params::CC.InferenceParams,
+        opt_params::CC.OptimizationParams,
+        rules,
+        options::Options)
+        @assert world <= Base.get_world_counter()
 
-    inf_cache = Vector{CC.InferenceResult}()
+        inf_cache = Vector{CC.InferenceResult}()
 
-    frame_cache = Vector{CC.InferenceState}()
-    opt_pipeline = optimization_pipeline
+        frame_cache = Vector{CC.InferenceState}()
+        opt_pipeline = optimization_pipeline
 
-    return CustomInterpreter(
-        world,
-        code_cache,
-        inf_cache,
-        inf_params,
-        opt_params,
-        frame_cache,
-        opt_pipeline,
-        rules
-    )
+        if options.use_cse
+            @warn "CSE enabled, might cause issues as effects are not tracked"
+        end
+
+        return new(
+            world,
+            code_cache,
+            inf_cache,
+            inf_params,
+            opt_params,
+            frame_cache,
+            opt_pipeline,
+            rules,
+            options
+        )
+    end
+
 end
 
 CC.InferenceParams(interp::CustomInterpreter) = interp.inf_params

@@ -46,7 +46,7 @@ A = MyMatrix(rand(N, N))
 B = MyMatrix(rand(N, N))
 
 function tooptimize(A::MyMatrix, B::MyMatrix)
-    return trace(transp(mul(A, B)))
+    return trace(mul(transp(A), transp(B)))
 end
 
 function nooptimize1(A::MyMatrix)
@@ -58,6 +58,7 @@ function nooptimize2(A::MyMatrix, B::MyMatrix)
 end
 
 rules = @theory A B begin
+    mul(transp(B), transp(A)) --> transp(mul(A, B))
     trace(transp(A)) --> trace(A)
     trace(mul(A, B)) --> mul_trace_optimized(A, B)
 end
@@ -65,21 +66,21 @@ end
 @testset "TraceOfMatMul" begin
     @test isapprox(trace(mul(A, B)), mul_trace_optimized(A, B))
 
-    @test (@custom rules nooptimize1(A)) == trace(A)
-    @test (@custom rules nooptimize2(A, B)) == mul(A, B)
+    @test (@custom Options() rules nooptimize1(A)) == trace(A)
+    @test (@custom Options() rules nooptimize2(A, B)) == mul(A, B)
 
     @test begin
-        optimized = @custom rules tooptimize(A, B)
+        optimized = @custom Options() rules tooptimize(A, B)
         expected = tooptimize(A, B)
         isapprox(optimized, expected)
     end
 end
 
-io = IOContext(stdout, :logbins => true)
+# io = IOContext(stdout, :logbins => true)
 
-noopt = @benchmark tooptimize($A, $B)
-show(io, MIME("text/plain"), noopt)
-println()
+# noopt = @benchmark tooptimize($A, $B)
+# show(io, MIME("text/plain"), noopt)
+# println()
 
-opt = @benchmark (@custom rules tooptimize($A, $B))
-show(io, MIME("text/plain"), opt)
+# opt = @benchmark (@custom Options() rules tooptimize($A, $B))
+# show(io, MIME("text/plain"), opt)

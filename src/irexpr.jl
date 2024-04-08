@@ -1,5 +1,6 @@
 using TermInterface
 using Metatheory.EGraphs
+using DataStructures: OrderedDict
 
 """
     IRExpr
@@ -145,8 +146,10 @@ struct ExprToIr
     types::Vector{Type}
     ssa_start::Integer
     mod::Module
+    cse_env::OrderedDict{Symbol,CC.SSAValue}
 
-    ExprToIr(mod::Module, range::CC.StmtRange) = new([], [], range.start, mod)
+    ExprToIr(mod::Module, range::CC.StmtRange) = new(
+        [], [], range.start, mod, OrderedDict())
 end
 
 function push_instr!(exprtoir::ExprToIr, instr, type)
@@ -161,7 +164,23 @@ end
 expr_to_ir!(_::ExprToIr, a::CC.Argument) = a
 expr_to_ir!(_::ExprToIr, g::GlobalRef) = g
 expr_to_ir!(_::ExprToIr, s::String) = s
-expr_to_ir!(exprtoir::ExprToIr, x) = x
+expr_to_ir!(_::ExprToIr, x) = x
+
+function expr_to_ir!(exprtoir::ExprToIr, s::Symbol)
+    if !haskey(exprtoir.cse_env, s)
+        @error "Symbol $s not found in CSE environment"
+    end
+    return exprtoir.cse_env[s]
+end
+
+function cse_expr_to_ir!(exprtoir::ExprToIr, sym::Symbol, expr::IRExpr)
+    ssa_val = expr_to_ir!(exprtoir, expr)
+    exprtoir.cse_env[sym] = ssa_val
+end
+
+function last_ssa_id(exprtoir::ExprToIr)
+    return SSAValue(length(exprtoir.instructions) + exprtoir.ssa_start - 1)
+end
 
 function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
     if expr.head == :theta
@@ -177,6 +196,23 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
         return
     end
 
+    if expr.head == :pi
+        val = expr_to_ir!(exprtoir, expr.args[1])
+        push_instr!(exprtoir, CC.PiNode(val, expr.type), expr.type)
+        return last_ssa_id(exprtoir)
+    end
+
+    if expr.head == :call
+        func = expr_to_ir!(exprtoir, expr.args[1])
+        args = map(expr.args[2:end]) do x
+            expr_to_ir!(exprtoir, x)
+        end
+
+        push_instr!(exprtoir, Expr(:call, func, args...), expr.type)
+
+        return last_ssa_id(exprtoir)
+    end
+
     func_name = expr.head
     args = map(expr.args) do x
         expr_to_ir!(exprtoir, x)
@@ -185,5 +221,5 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
     method = GlobalRef(exprtoir.mod, Symbol(func_name))
     push_instr!(exprtoir, Expr(:call, method, args...), expr.type)
 
-    return SSAValue(length(exprtoir.instructions) + exprtoir.ssa_start - 1)
+    return last_ssa_id(exprtoir)
 end

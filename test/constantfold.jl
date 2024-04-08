@@ -44,5 +44,5 @@ end
 
 @testset "ConstantFold" begin
     @test tooptimize(MyInt(12)) == MyInt(60)
-    @test (@custom rules tooptimize(MyInt(12))) == MyInt(60)
+    @test (@custom Options() rules tooptimize(MyInt(12))) == MyInt(60)
 end

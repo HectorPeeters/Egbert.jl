@@ -8,7 +8,7 @@ const global_ci_cache = CodeCache()
 Execute a function call using the e-graph optimization pipeline.
 """
 # TODO: this macro should get a better name
-macro custom(rules, ex::Expr)
+macro custom(options, rules, ex::Expr)
     Meta.isexpr(ex, :call) || error("not a function call")
     f, args... = ex.args
 
@@ -20,7 +20,8 @@ macro custom(rules, ex::Expr)
         ft = typeof(f)
         types = map(typeof, args)
         rules = $(esc(rules))
-        obj = custom_compiler(ft, types, rules)
+        options = $(esc(options))
+        obj = custom_compiler(ft, types, options, rules)
 
         obj(args...)
     end
@@ -31,7 +32,7 @@ end
 
 Compile a function using the e-graph optimization pipeline.
 """
-function custom_compiler(ft, types, rules::Any)
+function custom_compiler(ft, types, options, rules::Any)
     tt = Tuple{types...}
     sig = Tuple{ft,types...}
     world = Base.get_world_counter()
@@ -40,6 +41,7 @@ function custom_compiler(ft, types, rules::Any)
         code_cache=global_ci_cache,
         inf_params=CC.InferenceParams(),
         opt_params=CC.OptimizationParams(),
+        options=options,
         rules=rules)
 
     # Trigger the optimization pipeline

@@ -1,4 +1,4 @@
-using GpuOptim: @custom, @rewritetarget
+using GpuOptim: @custom, @rewritetarget, Options
 using Test: @testset, @test
 using Metatheory
 
@@ -49,6 +49,6 @@ end
         add(a, mul(b, c)) --> add_mul(a, b, c)
     end
 
-    @test (@custom rules optimizetarget(A, B, C)).data == [29, 42, 57]
-    @test (@custom rules nooptimizetarget(A, B)).data == [5, 7, 9]
+    @test (@custom Options() rules optimizetarget(A, B, C)).data == [29, 42, 57]
+    @test (@custom Options() rules nooptimizetarget(A, B)).data == [5, 7, 9]
 end

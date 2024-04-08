@@ -1,6 +1,7 @@
 using .Core.Compiler: naive_idoms, IRCode, Argument
 using Metatheory
-using Metatheory.EGraphs
+using Metatheory.EGraphs: collect_cse!, rec_extract, settermtype!, EGraph
+using DataStructures: OrderedDict
 
 const RewriteRule = Any
 
@@ -10,14 +11,15 @@ const RewriteRule = Any
 Perform e-graph rewrite optimizations on the given IR code using the specified 
 rules.
 """
-function perform_rewrites!(ir::IRCode, ci::CC.CodeInfo, rules::Any)
+function perform_rewrites!(
+    ir::IRCode, ci::CC.CodeInfo, interp::CustomInterpreter)
+
     # Only optimize functions defined in the Main module
     if ci.parent.def.module != Main
         return ir, false
     end
 
-    # Compute the control flow graph of the IR code
-    cfg = CC.compute_basic_blocks(ir.stmts.stmt)
+    cfg = ir.cfg
 
     # Currently, we only support functions with a single block
     if length(cfg.blocks) != 1
@@ -36,10 +38,33 @@ function perform_rewrites!(ir::IRCode, ci::CC.CodeInfo, rules::Any)
         settermtype!(g, IRExpr)
 
         # Apply the rewrite rules to the e-graph
-        saturate!(g, rules)
+        saturate!(g, interp.rules)
 
         # Extract the optimized expression from the e-graph
-        result = extract!(g, astsize)
+        exprtoir = ExprToIr(ci.parent.def.module, block.stmts)
+
+        result::IRExpr = if interp.options.use_cse
+            analyze!(g, astsize, g.root)
+
+            # Collect all common subexpressions
+            cse_env = OrderedDict{EClassId,Tuple{Symbol,Any}}()
+            collect_cse!(g, astsize, g.root, cse_env, Set{EClassId}())
+
+            result = rec_extract(g, astsize, g.root; cse_env=cse_env)
+
+            # Convert the CSE environment
+            for value in values(cse_env)
+                cse_expr_to_ir!(exprtoir, value[1], value[2])
+            end
+
+            # Mark made_changes as true as the resulting instructions could
+            # change, even if their behaviour is identical
+            made_changes = true
+
+            result
+        else
+            extract!(g, astsize)
+        end
 
         # Continue if no changes were made
         result == irexpr && continue
@@ -47,7 +72,6 @@ function perform_rewrites!(ir::IRCode, ci::CC.CodeInfo, rules::Any)
         made_changes = true
 
         # Convert the optimized expression back to IR
-        exprtoir = ExprToIr(ci.parent.def.module, block.stmts)
         (optim_instr, optim_types) = expr_to_ir!(exprtoir, result)
 
         if length(optim_instr) > length(block.stmts)
@@ -72,6 +96,7 @@ function perform_rewrites!(ir::IRCode, ci::CC.CodeInfo, rules::Any)
             ir.stmts.type[i+block.stmts.start-1] = Nothing
             ir.stmts.info[i+block.stmts.start-1] = CC.NoCallInfo()
             ir.stmts.flag[i+block.stmts.start-1] = CC.IR_FLAG_NULL
+            ir.stmts.line[i+block.stmts.start-1] = 0
         end
     end
 

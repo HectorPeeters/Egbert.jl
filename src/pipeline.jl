@@ -45,15 +45,10 @@ function optimization_pipeline(interp)
         CC.compact!(ir, true) |> pass_changed)
 
     # Perform rewrite optimizations until fixedpoint is reached
-    CC.register_fixedpointpass!(pm, "rewrite", function (ir, ci, sv)
-        ir, changed = perform_rewrites!(ir, ci, interp.rules)
-        if changed
-            ir = CC.compact!(ir)
-            ir = CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds)
-            ir = CC.compact!(ir)
-        end
-        return ir, changed
-    end)
+    CC.register_pass!(pm, "rewrite", (ir, ci, sv) ->
+        perform_rewrites!(ir, ci, interp))
+    CC.register_condpass!(pm, "compact 4", (ir, _, _) ->
+        CC.compact!(ir, true) |> pass_changed)
 
     # Cleanup calls to compiler barrier functions
     CC.register_pass!(pm, "cleanup", (ir, ci, sv) ->
