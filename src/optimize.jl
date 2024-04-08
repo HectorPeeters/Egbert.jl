@@ -1,7 +1,6 @@
 using .Core.Compiler: naive_idoms, IRCode, Argument
 using Metatheory
 using Metatheory.EGraphs: collect_cse!, rec_extract, settermtype!, EGraph
-using DataStructures: OrderedDict
 
 const RewriteRule = Any
 

@@ -13,6 +13,7 @@ struct IRExpr
     head::Any
     args::Vector{Any}
     type::Any
+    order::Union{Nothing,Integer}
 end
 
 function Base.:(==)(a::IRExpr, b::IRExpr)
@@ -23,10 +24,17 @@ TermInterface.istree(e::IRExpr) = true
 TermInterface.operation(e::IRExpr) = e.head
 TermInterface.exprhead(::IRExpr) = :call
 TermInterface.arguments(e::IRExpr) = e.args
-TermInterface.metadata(e::IRExpr) = (type = e.type)
+TermInterface.metadata(e::IRExpr) = (type=e.type, order=e.order)
 
-function TermInterface.similarterm(x::IRExpr, head, args; metadata=nothing, exprhead=:call)
-    IRExpr(head, args, metadata)
+function TermInterface.similarterm(
+    x::IRExpr, head, args;
+    metadata=nothing, exprhead=:call
+)
+    if metadata !== nothing
+        IRExpr(head, args, metadata.type, metadata.order)
+    else
+        IRExpr(head, args, nothing, nothing)
+    end
 end
 
 function EGraphs.egraph_reconstruct_expression(
@@ -34,16 +42,26 @@ function EGraphs.egraph_reconstruct_expression(
     metadata=nothing,
     exprhead=nothing
 )
-    IRExpr(op, args, metadata)
+    if metadata !== nothing
+        IRExpr(op, args, metadata.type, metadata.order)
+    else
+        IRExpr(op, args, nothing, nothing)
+    end
 end
 
-struct IrToExpr
+mutable struct IrToExpr
     instructions::Vector{Any}
     types::Vector{Any}
     flags::Vector{Any}
     range::CC.StmtRange
     converted::Vector{Bool}
     ssa_index::Integer
+    # NOTE: This value is used to order arguments in a function call in cases
+    #       like this: add(a, add(b, c)) --> add3(b, c, a)
+    #       The order in which the IR for the arguments is generated is
+    #       important. It should still be `a, b, c` even though the order
+    #       of the arguments is now `b, c, a`.
+    current_index::Integer
 
     IrToExpr(instrs::CC.InstructionStream, range::CC.StmtRange) = new(
         instrs.stmt,
@@ -51,8 +69,10 @@ struct IrToExpr
         instrs.flag,
         range,
         fill(false, length(instrs.stmt)),
-        1
+        1,
+        0
     )
+
 end
 
 """
@@ -88,57 +108,64 @@ function get_root_expr!(instrs::CC.InstructionStream, range)
         end
     end
 
-    return IRExpr(:theta, reverse(toplevel_exprs), nothing)
+    return IRExpr(:theta, reverse(toplevel_exprs), nothing, nothing)
 end
 
 function ir_to_expr!(irtoexpr::IrToExpr, s::CC.SSAValue)
+    irtoexpr.current_index = s.id
+
     if s.id < irtoexpr.range.start || s.id > irtoexpr.range.stop
         return s
     end
 
-    # println(irtoexpr.flags[s.id], " ", irtoexpr.instructions[s.id])
     markinstruction!(irtoexpr, s.id)
-    return ir_to_expr!(irtoexpr, irtoexpr.instructions[s.id], irtoexpr.types[s.id])
+    return ir_to_expr!(
+        irtoexpr,
+        irtoexpr.instructions[s.id],
+        irtoexpr.types[s.id]
+    )
 end
 
-ir_to_expr!(_::IrToExpr, n::Nothing) = n
-ir_to_expr!(_::IrToExpr, a::CC.Argument) = a
-ir_to_expr!(_::IrToExpr, q::QuoteNode) = q
-ir_to_expr!(_::IrToExpr, m::MethodInstance) = m
-ir_to_expr!(_::IrToExpr, r::GlobalRef) = r
-ir_to_expr!(_::IrToExpr, s::String) = s
 ir_to_expr!(_::IrToExpr, x) = x
 
 function ir_to_expr!(irtoexpr::IrToExpr, p::CC.PiNode, t)
-    return IRExpr(:pi, [ir_to_expr!(irtoexpr, p.val)], p.typ)
-end
-
-function ir_to_expr!(irtoexpr::IrToExpr, p::CC.PhiNode, t)
-    return IRExpr(:phi, [ir_to_expr!(irtoexpr, x) for x in p.values], t)
-end
-
-function ir_to_expr!(irtoexpr::IrToExpr, p::CC.GotoIfNot, t)
-    return IRExpr(:gotoifnot, [ir_to_expr!(irtoexpr, p.cond), p.dest], t)
-end
-
-function ir_to_expr!(_::IrToExpr, p::CC.GotoNode, t)
-    return IRExpr(:goto, [p.label], t)
+    return IRExpr(
+        :pi,
+        [ir_to_expr!(irtoexpr, p.val)],
+        p.typ,
+        irtoexpr.current_index
+    )
 end
 
 function ir_to_expr!(irtoexpr::IrToExpr, r::CC.ReturnNode, t)
-    return IRExpr(:ret, [ir_to_expr!(irtoexpr, r.val)], t)
+    return IRExpr(
+        :ret,
+        [ir_to_expr!(irtoexpr, r.val)],
+        t,
+        irtoexpr.current_index
+    )
 end
 
 function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
     if e.head == :invoke
-        return IRExpr(Symbol(e.args[1].def.name), map(e.args[3:end]) do x
+        return IRExpr(
+            Symbol(e.args[1].def.name),
+            map(enumerate(e.args[3:end])) do (i, x)
                 ir_to_expr!(irtoexpr, x)
-            end, t)
+            end,
+            t,
+            irtoexpr.current_index
+        )
     end
 
-    return IRExpr(e.head, map(e.args) do x
+    return IRExpr(
+        e.head,
+        map(enumerate(e.args)) do (i, x)
             ir_to_expr!(irtoexpr, x)
-        end, t)
+        end,
+        t,
+        irtoexpr.current_index
+    )
 end
 
 struct ExprToIr
@@ -161,9 +188,6 @@ function push_instr!(exprtoir::ExprToIr, instr, type)
     end
 end
 
-expr_to_ir!(_::ExprToIr, a::CC.Argument) = a
-expr_to_ir!(_::ExprToIr, g::GlobalRef) = g
-expr_to_ir!(_::ExprToIr, s::String) = s
 expr_to_ir!(_::ExprToIr, x) = x
 
 function expr_to_ir!(exprtoir::ExprToIr, s::Symbol)
@@ -182,11 +206,58 @@ function last_ssa_id(exprtoir::ExprToIr)
     return SSAValue(length(exprtoir.instructions) + exprtoir.ssa_start - 1)
 end
 
+"""
+    convert_sorted_args!(exprtoir::ExprToIr, args::Vector{Any})
+
+Emits the instructions for the arguments of an expression in the order
+determined by the order field of each argument. This ensures that the arguments
+are emitted in the correct order, even when an e-graph optimization has
+reordered the arguments.
+"""
+function convert_sorted_args!(exprtoir::ExprToIr, args::Vector{Any})
+    result::Vector{Any} = fill(missing, length(args))
+    low = typemin(Int32)
+
+    for _ in 1:length(args)
+        # Start at the first index we haven't converted yet
+        next_index = findfirst(x -> x === missing, result)
+
+        for (j, arg) in enumerate(args)
+            # Skip arguments we've already converted
+            result[j] !== missing && continue
+
+            # If the argument doesn't have an order, emit next
+            if !isa(arg, IRExpr)
+                next_index = j
+                break
+            end
+
+            # Skip arguments with an order lower than the current low
+            arg.order < low && continue
+
+            # If the argument has a lower order than the current next_index
+            # update it
+            if arg.order < args[next_index].order
+                next_index = j
+            end
+        end
+
+        # Update our low order if the current argument has an order
+        if args[next_index] isa Expr
+            low = args[next_index].order
+        end
+
+        # Emit the argument
+        result[next_index] = expr_to_ir!(exprtoir, args[next_index])
+    end
+
+    return result
+end
+
 function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
     if expr.head == :theta
-        for e in expr.args
-            expr_to_ir!(exprtoir, e)
-        end
+        convert_sorted_args!(exprtoir, expr.args)
+
         return (exprtoir.instructions, exprtoir.types)
     end
 
@@ -204,21 +275,16 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
 
     if expr.head == :call
         func = expr_to_ir!(exprtoir, expr.args[1])
-        args = map(expr.args[2:end]) do x
-            expr_to_ir!(exprtoir, x)
-        end
-
+        args = convert_sorted_args!(exprtoir, expr.args[2:end])
         push_instr!(exprtoir, Expr(:call, func, args...), expr.type)
 
         return last_ssa_id(exprtoir)
     end
 
     func_name = expr.head
-    args = map(expr.args) do x
-        expr_to_ir!(exprtoir, x)
-    end
-
+    args = convert_sorted_args!(exprtoir, expr.args)
     method = GlobalRef(exprtoir.mod, Symbol(func_name))
+
     push_instr!(exprtoir, Expr(:call, method, args...), expr.type)
 
     return last_ssa_id(exprtoir)

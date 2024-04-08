@@ -32,7 +32,7 @@ rules = @theory a b begin
     add(a, b) == add(b, a)
 end
 
-@testset "TraceOfMatMul" begin
+@testset "CommonSubexpressionElimination" begin
     @test tooptimize() == MyInt(4)
 
     @test (@custom Options(use_cse=true) rules tooptimize()) == MyInt(4)
