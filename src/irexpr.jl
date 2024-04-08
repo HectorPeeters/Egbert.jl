@@ -11,7 +11,7 @@ IRExpr object, which is then converted back to IRCode after optimizations.
 struct IRExpr
     head::Any
     args::Vector{Any}
-    type::Union{Nothing,Type}
+    type::Any
 end
 
 function Base.:(==)(a::IRExpr, b::IRExpr)
@@ -106,13 +106,13 @@ ir_to_expr!(_::IrToExpr, q::QuoteNode) = q
 ir_to_expr!(_::IrToExpr, m::MethodInstance) = m
 ir_to_expr!(_::IrToExpr, r::GlobalRef) = r
 ir_to_expr!(_::IrToExpr, s::String) = s
+ir_to_expr!(_::IrToExpr, x) = x
 
 function ir_to_expr!(irtoexpr::IrToExpr, p::CC.PiNode, t)
     return IRExpr(:pi, [ir_to_expr!(irtoexpr, p.val)], p.typ)
 end
 
 function ir_to_expr!(irtoexpr::IrToExpr, p::CC.PhiNode, t)
-    # TODO: this nothing is probably incorrect
     return IRExpr(:phi, [ir_to_expr!(irtoexpr, x) for x in p.values], t)
 end
 
@@ -151,12 +151,17 @@ end
 
 function push_instr!(exprtoir::ExprToIr, instr, type)
     push!(exprtoir.instructions, instr)
-    push!(exprtoir.types, type)
+    if type !== nothing
+        push!(exprtoir.types, type)
+    else
+        push!(exprtoir.types, Any)
+    end
 end
 
 expr_to_ir!(_::ExprToIr, a::CC.Argument) = a
 expr_to_ir!(_::ExprToIr, g::GlobalRef) = g
 expr_to_ir!(_::ExprToIr, s::String) = s
+expr_to_ir!(exprtoir::ExprToIr, x) = x
 
 function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
     if expr.head == :theta
