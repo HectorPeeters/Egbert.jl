@@ -4,29 +4,21 @@ using GpuOptim: @custom, @rewritetarget, Options
 using Test: @testset, @test
 using Metatheory
 
-struct MyInt
-    data::Integer
-
-    @rewritetarget function MyInt(x::Integer)::MyInt
-        return new(x)
-    end
+@rewritetarget function add(a::Integer, b::Integer)::Integer
+    return a + b
 end
 
-@rewritetarget function add(a::MyInt, b::MyInt)::MyInt
-    return MyInt(a.data + b.data)
+@rewritetarget function mul(a::Integer, b::Integer)::Integer
+    return a * b
 end
 
-@rewritetarget function mul(a::MyInt, b::MyInt)::MyInt
-    return MyInt(a.data * b.data)
+@rewritetarget function pow(a::Integer)::Integer
+    return a * a
 end
 
-@rewritetarget function pow(a::MyInt)::MyInt
-    return mul(a, a)
-end
-
-function tooptimize(c::MyInt)
-    a = MyInt(2)
-    b = MyInt(3)
+function tooptimize(c::Integer)
+    a = 2
+    b = 3
     d = add(a, b)
     return mul(c, d)
 end
@@ -38,13 +30,12 @@ rules = @theory a b begin
     mul(a, b) == mul(b, a)
 
     # Constant folding rules
-    MyInt(a::Integer) => MyInt(a)
-    add(a::MyInt, b::MyInt) => add(a, b)
-    mul(a::MyInt, b::MyInt) => mul(a, b)
-    pow(a::MyInt) => pow(a)
+    add(a::Integer, b::Integer) => add(a, b)
+    mul(a::Integer, b::Integer) => mul(a, b)
+    pow(a::Integer) => pow(a)
 end
 
 @testset "ConstantFold" begin
-    @test tooptimize(MyInt(12)) == MyInt(60)
-    @test (@custom Options() rules tooptimize(MyInt(12))) == MyInt(60)
+    @test tooptimize(12) == 60
+    @test (@custom Options() rules tooptimize(12)) == 60
 end

@@ -32,7 +32,7 @@ end
 
 Compile a function using the e-graph optimization pipeline.
 """
-function custom_compiler(ft, types, options, rules::Any)
+function custom_compiler(ft, types, options::Options, rules::Any)
     tt = Tuple{types...}
     sig = Tuple{ft,types...}
     world = Base.get_world_counter()
