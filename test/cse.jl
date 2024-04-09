@@ -1,3 +1,5 @@
+# Tests showing the common subexpression elimination capabilities
+
 using GpuOptim: @custom, @rewritetarget, Options
 using Test: @testset, @test
 using LinearAlgebra: diag, sum, transpose

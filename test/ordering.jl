@@ -1,3 +1,5 @@
+# Test cases to ensure the evaluation order of arguments is preserved
+
 using GpuOptim: @custom, @rewritetarget, Options
 using Test: @testset, @test
 using LinearAlgebra: diag, sum, transpose

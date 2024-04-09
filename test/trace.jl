@@ -1,3 +1,6 @@
+# A test rewriting the trace of a matrix multiplication to a more efficient
+# implementation.
+
 using GpuOptim: @custom, @rewritetarget, Options
 using Test: @testset, @test
 using LinearAlgebra: diag, sum, transpose

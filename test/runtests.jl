@@ -1,3 +1,5 @@
+# A simple example of a rewrite test
+
 using GpuOptim: @custom, @rewritetarget, Options
 using Test: @testset, @test
 using Metatheory

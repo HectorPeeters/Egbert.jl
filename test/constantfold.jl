@@ -1,3 +1,5 @@
+# Tests showing how constant folding can be implemented using rewrite rules
+
 using GpuOptim: @custom, @rewritetarget, Options
 using Test: @testset, @test
 using Metatheory
