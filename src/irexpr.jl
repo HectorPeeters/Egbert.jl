@@ -49,6 +49,26 @@ function EGraphs.egraph_reconstruct_expression(
     end
 end
 
+function EGraphs.make(::Val{:metadata_analysis}, g, n)
+    return (type=Any, order=nothing)
+end
+
+function EGraphs.join(anaysis::Val{:metadata_analysis}, a, b)
+    order = nothing
+    if a.order !== nothing
+        if b.order !== nothing
+            order = min(a.order, b.order)
+        else
+            order = a.order
+        end
+    elseif b.order !== nothing
+        order = b.order
+    end
+
+    a.type != b.type && error("Types do not match")
+    return (type=a.type, order=order)
+end
+
 mutable struct IrToExpr
     instructions::Vector{Any}
     types::Vector{Any}
@@ -170,7 +190,7 @@ end
 
 struct ExprToIr
     instructions::Vector{Any}
-    types::Vector{Type}
+    types::Vector{Any}
     ssa_start::Integer
     mod::Module
     cse_env::OrderedDict{Symbol,CC.SSAValue}
@@ -227,7 +247,7 @@ function convert_sorted_args!(exprtoir::ExprToIr, args::Vector{Any})
             result[j] !== missing && continue
 
             # If the argument doesn't have an order, emit next
-            if !isa(arg, IRExpr)
+            if !isa(arg, IRExpr) || arg.order === nothing
                 next_index = j
                 break
             end

@@ -37,8 +37,8 @@ end
     return MyInt(a.data * b.data)
 end
 
-function tooptimize()
-    return add(newval(1), add(newval(2), newval(3)))
+function tooptimize(a, b, c)
+    return add(newval(a), add(newval(b), newval(c)))
 end
 
 rules = @theory a b c begin
@@ -46,17 +46,17 @@ rules = @theory a b c begin
 end
 
 @testset "ArgumentOrdering" begin
-    @test tooptimize() == MyInt(6)
+    @test tooptimize(1, 2, 3) == MyInt(6)
 
     @test begin
         global check_order = []
-        tooptimize()
+        tooptimize(1, 2, 3)
         check_order == [1, 2, 3]
     end
 
     @test begin
         global check_order = []
-        @custom Options() rules tooptimize()
+        @custom Options() rules tooptimize(1, 2, 3)
         check_order == [1, 2, 3]
     end
 end

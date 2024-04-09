@@ -24,9 +24,9 @@ end
     return MyInt(a.data * b.data)
 end
 
-function tooptimize()
-    a = MyInt(2)
-    b = MyInt(2)
+function tooptimize(c::MyInt)
+    a = mul(c, MyInt(2))
+    b = mul(c, MyInt(2))
     return add(a, b)
 end
 
@@ -35,7 +35,7 @@ rules = @theory a b begin
 end
 
 @testset "CommonSubexpressionElimination" begin
-    @test tooptimize() == MyInt(4)
+    @test tooptimize(MyInt(2)) == MyInt(8)
 
-    @test (@custom Options(use_cse=true) rules tooptimize()) == MyInt(4)
+    @test (@custom Options(use_cse=true) rules tooptimize(MyInt(2))) == MyInt(8)
 end
