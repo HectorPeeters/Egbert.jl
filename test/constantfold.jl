@@ -1,4 +1,4 @@
-using GpuOptim: @custom, @rewritetarget
+using GpuOptim: @custom, @rewritetarget, Options
 using Test: @testset, @test
 using Metatheory
 
