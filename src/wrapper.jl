@@ -37,9 +37,8 @@ macro rewritetarget(func::Expr)
     args = signature_noret.args[2:end]
     ret_type = signature.args[2]
 
-    # Change the name of the implementation function by appending `impl!_`
-    # func_name_impl = get_impl_function_name(func_name)
-    func_name_impl = Symbol("impl_", func_name)
+    # Change the name of the implementation function
+    func_name_impl = get_impl_function_name(func_name)
     func.args[begin].args[begin].args[begin] = func_name_impl
 
     # Return a wrapper around the function that encapsulates the original 
