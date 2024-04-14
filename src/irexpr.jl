@@ -53,7 +53,7 @@ function EGraphs.make(::Val{:metadata_analysis}, g, n)
     return (type=Any, order=nothing)
 end
 
-function EGraphs.join(anaysis::Val{:metadata_analysis}, a, b)
+function EGraphs.join(::Val{:metadata_analysis}, a, b)
     order = nothing
     if a.order !== nothing
         if b.order !== nothing
@@ -82,6 +82,7 @@ mutable struct IrToExpr
     #       important. It should still be `a, b, c` even though the order
     #       of the arguments is now `b, c, a`.
     current_index::Integer
+    has_sideeffects::Bool
 
     IrToExpr(instrs::CC.InstructionStream, range::CC.StmtRange) = new(
         instrs.stmt,
@@ -90,7 +91,8 @@ mutable struct IrToExpr
         range,
         fill(false, length(instrs.stmt)),
         1,
-        0
+        0,
+        false
     )
 
 end
@@ -106,9 +108,7 @@ function markinstruction!(irtoexpr::IrToExpr, id::Integer)
     irtoexpr.converted[id-irtoexpr.range.start+1] = true
 end
 
-function get_root_expr!(instrs::CC.InstructionStream, range)
-    irtoexpr = IrToExpr(instrs, range)
-
+function get_root_expr!(irtoexpr::IrToExpr)
     toplevel_exprs = []
 
     while true
@@ -168,6 +168,10 @@ end
 
 function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
     if e.head == :invoke
+        flags = irtoexpr.flags[irtoexpr.current_index]
+        effect_free = CC.has_flag(flags, CC.IR_FLAG_EFFECT_FREE)
+        irtoexpr.has_sideeffects |= !effect_free
+
         return IRExpr(
             Symbol(e.args[1].def.name),
             map(enumerate(e.args[3:end])) do (i, x)
@@ -201,10 +205,10 @@ end
 
 function push_instr!(exprtoir::ExprToIr, instr, type)
     push!(exprtoir.instructions, instr)
-    if type !== nothing
-        push!(exprtoir.types, type)
-    else
+    if type === nothing
         push!(exprtoir.types, Any)
+    else
+        push!(exprtoir.types, type)
     end
 end
 

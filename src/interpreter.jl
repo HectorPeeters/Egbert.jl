@@ -1,10 +1,10 @@
 using .Core.Compiler: OptimizationState, InferenceResult, InferenceState
 
 struct Options
-    use_cse::Bool
+    ignore_sideeffects
 
-    function Options(; use_cse::Bool=false)
-        new(use_cse)
+    function Options(; ignore_sideeffects::Bool=false)
+        new(ignore_sideeffects)
     end
 end
 
@@ -36,8 +36,8 @@ mutable struct CustomInterpreter <: CC.AbstractInterpreter
         frame_cache = Vector{CC.InferenceState}()
         opt_pipeline = optimization_pipeline
 
-        if options.use_cse
-            @warn "CSE enabled, might cause issues as effects are not tracked"
+        if options.ignore_sideeffects
+            @warn "Ignoring sideeffects, optimized results might not behave as expected"
         end
 
         return new(

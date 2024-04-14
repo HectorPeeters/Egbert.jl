@@ -30,7 +30,8 @@ function perform_rewrites!(
 
     for (i, block) in enumerate(cfg.blocks)
         # Convert the IR block to an expression tree
-        irexpr = get_root_expr!(ir.stmts, block.stmts)
+        irtoexpr = IrToExpr(ir.stmts, block.stmts)
+        irexpr = get_root_expr!(irtoexpr)
 
         # Create an e-graph from the expression tree
         g = EGraph(irexpr; keepmeta=true)
@@ -42,7 +43,7 @@ function perform_rewrites!(
         # Extract the optimized expression from the e-graph
         exprtoir = ExprToIr(ci.parent.def.module, block.stmts)
 
-        result::IRExpr = if interp.options.use_cse
+        result::IRExpr = if !irtoexpr.has_sideeffects || interp.options.ignore_sideeffects
             analyze!(g, astsize, g.root)
 
             # Collect all common subexpressions
