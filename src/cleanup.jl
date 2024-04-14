@@ -32,13 +32,11 @@ function replace_compbarrier_calls!(ir::IRCode, interp::CustomInterpreter)
 
             # Check if the method starts with a call to `Base.compilerbarrier`
             if first_instr isa Expr &&
-               first_instr.head == :invoke
-                call_name = first_instr.args[begin].def.name
+               first_instr.head == :invoke &&
+               get_impl_function_name(mi.def.name) == first_instr.args[begin].def.name
+                push!(wrapper_methods, mi)
+                break
 
-                if get_impl_function_name(mi.def.name) == call_name
-                    push!(wrapper_methods, mi)
-                    break
-                end
             end
         end
     end
