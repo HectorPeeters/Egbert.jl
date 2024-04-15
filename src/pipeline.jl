@@ -25,16 +25,13 @@ function optimization_pipeline(interp)
     pm = CC.PassManager()
 
     # Perform initial conversion to IRCode
-    CC.register_pass!(pm, "to ircode", (_, ci, sv) ->
-        CC.convert_to_ircode(ci, sv) |> pass_changed)
-    CC.register_pass!(pm, "slot2reg", (ir, ci, sv) ->
-        CC.slot2reg(ir, ci, sv) |> pass_changed)
+    CC.register_pass!(pm, "slot2reg", CC.slot2reg)
     CC.register_pass!(pm, "compact 1", (ir, _, _) ->
         CC.compact!(ir) |> pass_changed)
 
     # Perform first pass of normal optimization pipeline
     CC.register_pass!(pm, "inlining", (ir, ci, sv) ->
-        CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds) |> pass_changed)
+        CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds))
     CC.register_pass!(pm, "compact 2", (ir, _, _) ->
         CC.compact!(ir) |> pass_changed)
     CC.register_pass!(pm, "SROA", (ir, _, sv) ->
@@ -56,8 +53,7 @@ function optimization_pipeline(interp)
 
     # Perform second pass of normal optimization pipeline
     CC.register_pass!(pm, "inlining", (ir, ci, sv) ->
-        CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds) |>
-        pass_changed)
+        CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds))
     CC.register_pass!(pm, "compact 2", (ir, _, _) ->
         CC.compact!(ir) |> pass_changed)
 
