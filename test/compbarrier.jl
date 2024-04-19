@@ -1,3 +1,5 @@
+# This file contains a simple example of the compilerbarrier macro
+
 macro testmacro(func::Expr)
     if func.args[begin].args[begin] isa Symbol
         return error("Please add a returntype to the function")

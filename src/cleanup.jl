@@ -1,3 +1,21 @@
+"""
+    is_invoke(instr, name)
+
+Check if an instruction is an invoke instruction with a specific name.
+"""
+function is_invoke(instr, name)
+    return Meta.isexpr(instr, :invoke) &&
+           instr.args[begin].def.module == parentmodule(Module()) &&
+           instr.args[begin].def.name == name
+end
+
+"""
+    replace_compbarrier_calls!(ir::IRCode, interp::CustomInterpreter)
+
+Replace calls to compilerbarrier wrapper methods with the actual
+implementation. This removes the additional indirection in cases where
+@rewritetarget functions were not optimized.
+"""
 function replace_compbarrier_calls!(ir::IRCode, interp::CustomInterpreter)
     # List of all compilerbarrier wrapper methods
     wrapper_methods = []
@@ -6,21 +24,27 @@ function replace_compbarrier_calls!(ir::IRCode, interp::CustomInterpreter)
     for (mi, cis) in interp.code_cache.dict
         for ci in cis
             ci = ci.inferred
+            if ci isa Nothing
+                continue
+            end
+
+            first_instr = ci.code[begin]
 
             # Check if the method starts with a call to `Base.compilerbarrier`
-            if ci.code[begin].head == :call &&
-                ci.code[begin].args[begin] == GlobalRef(Base, :compilerbarrier)
+            if first_instr isa Expr &&
+               first_instr.head == :invoke &&
+               get_impl_function_name(mi.def.name) == first_instr.args[begin].def.name
                 push!(wrapper_methods, mi)
                 break
+
             end
         end
     end
 
-    instructions = instrs(ir)
-
+    # Track if we made any changes to prevent unnecessary compact pass
     made_changes = false
 
-    for (i, instruction) in enumerate(instructions)
+    for (i, instruction) in enumerate(ir.stmts.stmt)
         for method in wrapper_methods
 
             # If we call one of the compilerbarrier wrapper methods, replace it with the actual method
@@ -36,7 +60,7 @@ function replace_compbarrier_calls!(ir::IRCode, interp::CustomInterpreter)
                 impl_ref = GlobalRef(method.def.module, impl_func_name)
 
                 m = methods(eval(impl_ref), params) |> first
-                mi = Core.Compiler.specialize_method(m, Tuple{ret_type, params...}, Core.svec())
+                mi = Core.Compiler.specialize_method(m, Tuple{ret_type,params...}, Core.svec())
 
                 # Replace the method instance and the 
                 instruction.args[1] = mi
