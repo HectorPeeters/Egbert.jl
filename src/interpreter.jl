@@ -8,6 +8,8 @@ struct Options
     end
 end
 
+struct CustomInterpreterToken end
+
 mutable struct CustomInterpreter <: CC.AbstractInterpreter
     world::UInt
 
@@ -60,7 +62,7 @@ CC.OptimizationParams(interp::CustomInterpreter) = interp.opt_params
 CC.get_inference_world(interp::CustomInterpreter) = interp.world
 CC.get_inference_cache(interp::CustomInterpreter) = interp.inf_cache
 CC.code_cache(interp::CustomInterpreter) = CC.WorldView(interp.code_cache, interp.world)
-CC.cache_owner(_::CustomInterpreter) = nothing
+CC.cache_owner(::CustomInterpreter) = CustomInterpreterToken
 
 CC.build_opt_pipeline(interp::CustomInterpreter) = interp.opt_pipeline(interp)
 
