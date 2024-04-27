@@ -28,6 +28,10 @@ function replace_compbarrier_calls!(ir::IRCode, interp::CustomInterpreter)
                 continue
             end
 
+            if ci isa String
+                ci = CC._uncompressed_ir(mi.def, ci)
+            end
+
             first_instr = ci.code[begin]
 
             # Check if the method starts with a call to `Base.compilerbarrier`
