@@ -17,6 +17,7 @@ end
 end
 
 function perform_mul(a::CustomList, b::CustomList)::CustomList
+    global performed_mul = true
     return CustomList(a.data .* b.data)
 end
 
@@ -51,5 +52,11 @@ end
     end
 
     @test (@custom Options() rules optimizetarget(A, B, C)).data == [29, 42, 57]
+    @test begin
+        global performed_mul = false
+        @custom Options() rules optimizetarget(A, B, C)
+        performed_mul == false
+    end
+
     @test (@custom Options() rules nooptimizetarget(A, B)).data == [5, 7, 9]
 end
