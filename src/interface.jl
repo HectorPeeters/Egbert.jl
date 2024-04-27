@@ -44,11 +44,17 @@ function custom_compiler(ft, types, options::Options, rules::Any)
         options=options,
         rules=rules)
 
-    # Trigger the optimization pipeline
-    irs = Base.code_ircode_by_type(sig; interp)
-    isempty(irs) && throw(MethodError(ft, tt, world))
+    match, _ = CC._findsup(sig, nothing, world)
+    match === nothing && throw(MethodError(ft, tt, world))
+    mi = CC.specialize_method(match)
 
-    ir, _ = only(irs)
+    wvc = CC.code_cache(interp)
 
-    OpaqueClosure(ir)
+    cached = CC.get(wvc, mi, nothing)
+    if cached !== nothing
+        return OpaqueClosure(cached.inferred)
+    end
+
+    inferred = CC.typeinf_ext_toplevel(interp, mi)
+    return OpaqueClosure(inferred)
 end

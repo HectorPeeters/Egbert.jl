@@ -20,7 +20,7 @@ mutable struct CustomInterpreter <: CC.AbstractInterpreter
     opt_params::CC.OptimizationParams
 
     frame_cache::Vector{CC.InferenceState}
-    opt_pipeline::Function
+    opt_pipeline::CC.PassManager
 
     rules::Any
     options::Options
@@ -36,7 +36,7 @@ mutable struct CustomInterpreter <: CC.AbstractInterpreter
         inf_cache = Vector{CC.InferenceResult}()
 
         frame_cache = Vector{CC.InferenceState}()
-        opt_pipeline = optimization_pipeline
+        opt_pipeline = build_optimization_pipeline()
 
         if options.ignore_sideeffects
             @warn "Ignoring sideeffects, optimized results might not behave as expected"
@@ -64,7 +64,7 @@ CC.get_inference_cache(interp::CustomInterpreter) = interp.inf_cache
 CC.code_cache(interp::CustomInterpreter) = CC.WorldView(interp.code_cache, interp.world)
 CC.cache_owner(::CustomInterpreter) = CustomInterpreterToken
 
-CC.build_opt_pipeline(interp::CustomInterpreter) = interp.opt_pipeline(interp)
+CC.build_opt_pipeline(interp::CustomInterpreter) = interp.opt_pipeline
 
 CC.lock_mi_inference(::CustomInterpreter, ::MethodInstance) = nothing
 CC.unlock_mi_inference(::CustomInterpreter, ::MethodInstance) = nothing
