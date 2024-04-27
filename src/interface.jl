@@ -52,7 +52,14 @@ function custom_compiler(ft, types, options::Options, rules::Any)
 
     cached = CC.get(wvc, mi, nothing)
     if cached !== nothing
-        return OpaqueClosure(cached.inferred)
+        src = @atomic :monotonic cached.inferred
+        if isa(src, String)
+            src = CC._uncompressed_ir(mi.def, src)
+        else
+            isa(src, CC.CodeInfo) || return nothing
+        end
+        ir = CC.inflate_ir(src, mi)
+        return OpaqueClosure(ir)
     end
 
     inferred = CC.typeinf_ext_toplevel(interp, mi)

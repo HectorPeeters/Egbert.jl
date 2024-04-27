@@ -74,6 +74,6 @@ function CC.add_remark!(::CustomInterpreter, sv::CC.InferenceState, msg)
 end
 
 CC.may_optimize(interp::CustomInterpreter) = true
-CC.may_compress(interp::CustomInterpreter) = false
+CC.may_compress(interp::CustomInterpreter) = true
 CC.may_discard_trees(interp::CustomInterpreter) = true
 CC.verbose_stmt_info(interp::CustomInterpreter) = false
