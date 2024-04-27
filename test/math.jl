@@ -48,5 +48,3 @@ end
     @test tooptimize(12) == 196
     @test (@custom Options() rules tooptimize(12)) == 196
 end
-
-@benchmark (@custom Options() rules tooptimize(12))
