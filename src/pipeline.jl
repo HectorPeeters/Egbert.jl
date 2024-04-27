@@ -21,12 +21,12 @@ Helper function to indicate that a pass has changed the IR code.
 """
 pass_changed(x) = (x, true)
 
-function optimization_pipeline(interp)
+function build_optimization_pipeline()
     pm = CC.PassManager()
 
     # Perform initial conversion to IRCode
     CC.register_pass!(pm, "slot2reg", CC.slot2reg)
-    CC.register_pass!(pm, "compact 1", (ir, _, _) ->
+    CC.register_condpass!(pm, "compact 1", (ir, _, _) ->
         CC.compact!(ir) |> pass_changed)
 
     # Perform first pass of normal optimization pipeline
@@ -43,13 +43,13 @@ function optimization_pipeline(interp)
 
     # Perform rewrite optimizations until fixedpoint is reached
     CC.register_pass!(pm, "rewrite", (ir, ci, sv) ->
-        perform_rewrites!(ir, ci, interp))
+        perform_rewrites!(ir, ci, sv.inlining.interp))
     CC.register_condpass!(pm, "compact 4", (ir, _, _) ->
         CC.compact!(ir, true) |> pass_changed)
 
     # Cleanup calls to compiler barrier functions
     CC.register_pass!(pm, "cleanup", (ir, ci, sv) ->
-        replace_compbarrier_calls!(ir, interp))
+        replace_compbarrier_calls!(ir, sv.inlining.interp))
 
     # Perform second pass of normal optimization pipeline
     CC.register_pass!(pm, "inlining", (ir, ci, sv) ->
