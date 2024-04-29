@@ -148,6 +148,10 @@ end
 
 ir_to_expr!(_::IrToExpr, x) = x
 
+function ir_to_expr!(irtoexpr::IrToExpr, r::GlobalRef, t)
+    return IRExpr(:ref, [r], GlobalRef, irtoexpr.current_index)
+end
+
 function ir_to_expr!(irtoexpr::IrToExpr, p::CC.PiNode, t)
     return IRExpr(
         :pi,
@@ -289,6 +293,11 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
         val = expr_to_ir!(exprtoir, expr.args[1])
         push_instr!(exprtoir, CC.ReturnNode(val), expr.type)
         return
+    end
+
+    if expr.head == :ref
+        push_instr!(exprtoir, expr.args[1], expr.type)
+        return last_ssa_id(exprtoir)
     end
 
     if expr.head == :pi
