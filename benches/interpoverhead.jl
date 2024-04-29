@@ -1,6 +1,8 @@
 using GpuOptim: CodeCache
-using BenchmarkTools: @btime
-using Plots
+using BenchmarkTools: @benchmark
+using CSV
+using Tables
+using Statistics
 
 const CC = Core.Compiler
 
@@ -109,11 +111,12 @@ xs = []
 ys = []
 ys_custom = []
 
-for i in 1:34
+for i in 41:50
     println("Running for n = ", i)
     push!(xs, i)
-    push!(ys, @btime(fib($i)))
-    push!(ys_custom, @btime(@custom fib($i)))
-end
+    push!(ys, mean(@benchmark(fib($i))).time)
+    push!(ys_custom, mean(@benchmark(@custom fib($i))).time)
 
-plot(xs, [ys, ys_custom])
+    data = hcat(xs, ys, ys_custom)
+    CSV.write("output.csv", Tables.table(data), header=["x", "y", "y-custom"])
+end
