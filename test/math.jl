@@ -3,24 +3,32 @@ using Test: @testset, @test
 using Metatheory
 using BenchmarkTools: @benchmark
 
-@rewritetarget function add(a::Integer, b::Integer)::Integer
-    return a + b
+struct MyInteger
+    data::Integer
+
+    @rewritetarget function MyInteger(data::Integer)::MyInteger
+        new(data)
+    end
 end
 
-@rewritetarget function sub(a::Integer, b::Integer)::Integer
-    return a - b
+@rewritetarget function add(a::MyInteger, b::MyInteger)::MyInteger
+    return MyInteger(a.data + b.data)
 end
 
-@rewritetarget function mul(a::Integer, b::Integer)::Integer
-    return a * b
+@rewritetarget function sub(a::MyInteger, b::MyInteger)::MyInteger
+    return MyInteger(a.data - b.data)
 end
 
-@rewritetarget function pow(a::Integer)::Integer
-    return a * a
+@rewritetarget function mul(a::MyInteger, b::MyInteger)::MyInteger
+    return MyInteger(a.data * b.data)
 end
 
-function tooptimize(c::Integer)
-    return add(pow(2), add(mul(sub(3, 1), mul(2, c)), pow(c)))
+@rewritetarget function pow(a::MyInteger)::MyInteger
+    return MyInteger(a.data * a.data)
+end
+
+function tooptimize(a::MyInteger, b::MyInteger)
+    return add(pow(a), add(mul(MyInteger(2), mul(a, b)), pow(b)))
 end
 
 rules = @theory a b c begin
@@ -38,13 +46,13 @@ rules = @theory a b c begin
     pow(sub(a, b)) == add(sub(pow(a), mul(2, mul(a, b))), pow(b))
 
     # Constant folding rules
-    add(a::Integer, b::Integer) => add(a, b)
-    sub(a::Integer, b::Integer) => sub(a, b)
-    mul(a::Integer, b::Integer) => mul(a, b)
-    pow(a::Integer) => pow(a)
+    add(a::MyInteger, b::MyInteger) => add(a, b)
+    sub(a::MyInteger, b::MyInteger) => sub(a, b)
+    mul(a::MyInteger, b::MyInteger) => mul(a, b)
+    pow(a::MyInteger) => pow(a)
 end
 
 @testset "Identities" begin
-    @test tooptimize(12) == 196
-    @test (@custom Options() rules tooptimize(12)) == 196
+    @test tooptimize(MyInteger(12), MyInteger(13)) == MyInteger(625)
+    @test (@custom Options() rules tooptimize(MyInteger(12), MyInteger(13))) == MyInteger(625)
 end

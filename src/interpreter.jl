@@ -1,10 +1,8 @@
 using .Core.Compiler: OptimizationState, InferenceResult, InferenceState
 
 struct Options
-    ignore_sideeffects
-
-    function Options(; ignore_sideeffects::Bool=false)
-        new(ignore_sideeffects)
+    function Options(;)
+        new()
     end
 end
 
@@ -37,10 +35,6 @@ mutable struct CustomInterpreter <: CC.AbstractInterpreter
 
         frame_cache = Vector{CC.InferenceState}()
         opt_pipeline = build_optimization_pipeline()
-
-        if options.ignore_sideeffects
-            @warn "Ignoring sideeffects, optimized results might not behave as expected"
-        end
 
         return new(
             world,

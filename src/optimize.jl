@@ -22,7 +22,7 @@ function perform_rewrites!(
 
     # Currently, we only support functions with a single block
     if length(cfg.blocks) != 1
-        @warn "Skipping function with multiple blocks: $(size(cfg.blocks))"
+        @debug "Skipping function with multiple blocks: $(size(cfg.blocks))"
         return ir, false
     end
 
@@ -38,38 +38,21 @@ function perform_rewrites!(
         settermtype!(g, IRExpr)
 
         # Apply the rewrite rules to the e-graph
-        saturate!(g, interp.rules)
+        # params = SaturationParams(timeout=20, timelimit=1000000000, eclasslimit=4000)
+        saturate!(g, interp.rules) # |> println
 
-        # Extract the optimized expression from the e-graph
-        exprtoir = ExprToIr(ci.parent.def.module, block.stmts)
+        analyze!(g, astsize, g.root)
 
-        result::IRExpr = if !irtoexpr.has_sideeffects || interp.options.ignore_sideeffects
-            analyze!(g, astsize, g.root)
-
-            # Collect all common subexpressions
-            cse_env = OrderedDict{EClassId,Tuple{Symbol,Any}}()
-            collect_cse!(g, astsize, g.root, cse_env, Set{EClassId}())
-
-            result = rec_extract(g, astsize, g.root; cse_env=cse_env)
-
-            # Convert the CSE environment
-            for value in values(cse_env)
-                cse_expr_to_ir!(exprtoir, value[1], value[2])
-            end
-
-            # Mark made_changes as true as the resulting instructions could
-            # change, even if their behaviour is identical
-            made_changes = true
-
-            result
-        else
-            extract!(g, astsize)
-        end
+        # result = rec_extract(g, astsize, g.root; cse_env=cse_env)
+        result = extract!(g, astsize)
 
         # Continue if no changes were made
         result == irexpr && continue
 
         made_changes = true
+
+        # Extract the optimized expression from the e-graph
+        exprtoir = ExprToIr(ci.parent.def.module, block.stmts)
 
         # Convert the optimized expression back to IR
         (optim_instr, optim_types) = expr_to_ir!(exprtoir, result)
