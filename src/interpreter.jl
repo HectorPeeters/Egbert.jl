@@ -1,8 +1,15 @@
 using .Core.Compiler: OptimizationState, InferenceResult, InferenceState
+using Metatheory: astsize, SaturationParams
 
 struct Options
-    function Options(;)
-        new()
+    analysis_ref::Function
+    saturation_params::SaturationParams
+
+    function Options(;
+        analysis_ref=astsize,
+        saturation_params=SaturationParams()
+    )
+        new(analysis_ref, saturation_params)
     end
 end
 

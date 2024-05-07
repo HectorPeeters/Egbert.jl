@@ -37,14 +37,14 @@ function perform_rewrites!(
         g = EGraph(irexpr; keepmeta=true)
         settermtype!(g, IRExpr)
 
-        # Apply the rewrite rules to the e-graph
-        # params = SaturationParams(timeout=20, timelimit=1000000000, eclasslimit=4000)
-        saturate!(g, interp.rules) # |> println
+        # Saturate the e-graph using the rewrite rules defined in the macro call
+        saturate!(g, interp.rules, interp.options.saturation_params)
 
-        analyze!(g, astsize, g.root)
+        # Perform e-graph analysis using the specified analysis function
+        analyze!(g, interp.options.analysis_ref, g.root)
 
-        # result = rec_extract(g, astsize, g.root; cse_env=cse_env)
-        result = extract!(g, astsize)
+        # Extract the optimal expression based on the analysis function
+        result = extract!(g, interp.options.analysis_ref)
 
         # Continue if no changes were made
         result == irexpr && continue
