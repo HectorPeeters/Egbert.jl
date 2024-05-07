@@ -67,8 +67,6 @@ function replace_compbarrier_calls!(ir::IRCode, ci::CC.CodeInfo, sv::CC.Optimiza
 
                 # Get a reference to the actual implementation
                 impl_func_name = get_impl_function_name(method.def.name)
-                # println(method.def.name)
-                # println(impl_func_name)
 
                 impl_ref = GlobalRef(method.def.module, impl_func_name)
 
@@ -79,7 +77,7 @@ function replace_compbarrier_calls!(ir::IRCode, ci::CC.CodeInfo, sv::CC.Optimiza
                 instruction.args[1] = mi
                 instruction.args[2] = impl_ref
 
-                @info "Cleaned up wrapper call `" * string(method.def.name) * "` to `" * string(impl_ref.name) * "`"
+                @debug "Cleaned up wrapper call `" * string(method.def.name) * "` to `" * string(impl_ref.name) * "`"
 
                 made_changes = true
             end

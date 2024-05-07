@@ -14,26 +14,27 @@ struct IRExpr
     args::Vector{Any}
     type::Any
     order::Union{Nothing,Integer}
+    has_effects::Bool
 end
 
 function Base.:(==)(a::IRExpr, b::IRExpr)
-    a.head == b.head && a.args == b.args
+    a.head == b.head && a.args == b.args && a.order == b.order
 end
 
 TermInterface.istree(e::IRExpr) = true
 TermInterface.operation(e::IRExpr) = e.head
 TermInterface.exprhead(::IRExpr) = :call
 TermInterface.arguments(e::IRExpr) = e.args
-TermInterface.metadata(e::IRExpr) = (type=e.type, order=e.order)
+TermInterface.metadata(e::IRExpr) = (type=e.type, order=e.order, has_effects=e.has_effects)
 
 function TermInterface.similarterm(
-    x::IRExpr, head, args;
+    e::IRExpr, head, args;
     metadata=nothing, exprhead=:call
 )
     if metadata !== nothing
-        IRExpr(head, args, metadata.type, metadata.order)
+        IRExpr(head, args, metadata.type, metadata.order, metadata.has_effects)
     else
-        IRExpr(head, args, nothing, nothing)
+        IRExpr(head, args, nothing, nothing, nothing)
     end
 end
 
@@ -43,14 +44,14 @@ function EGraphs.egraph_reconstruct_expression(
     exprhead=nothing
 )
     if metadata !== nothing
-        IRExpr(op, args, metadata.type, metadata.order)
+        IRExpr(op, args, metadata.type, metadata.order, metadata.has_effects)
     else
-        IRExpr(op, args, nothing, nothing)
+        IRExpr(op, args, nothing, nothing, nothing)
     end
 end
 
 function EGraphs.make(::Val{:metadata_analysis}, g, n)
-    return (type=Any, order=nothing)
+    return (type=Any, order=nothing, has_effects=false)
 end
 
 function EGraphs.join(::Val{:metadata_analysis}, a, b)
@@ -66,7 +67,7 @@ function EGraphs.join(::Val{:metadata_analysis}, a, b)
     end
 
     a.type != b.type && error("Types do not match")
-    return (type=a.type, order=order)
+    return (type=a.type, order=order, has_effects=false)
 end
 
 mutable struct IrToExpr
@@ -75,14 +76,12 @@ mutable struct IrToExpr
     flags::Vector{Any}
     range::CC.StmtRange
     converted::Vector{Bool}
-    ssa_index::Integer
     # NOTE: This value is used to order arguments in a function call in cases
     #       like this: add(a, add(b, c)) --> add3(b, c, a)
     #       The order in which the IR for the arguments is generated is
     #       important. It should still be `a, b, c` even though the order
     #       of the arguments is now `b, c, a`.
-    current_index::Integer
-    has_sideeffects::Bool
+    ssa_index::Integer
 
     IrToExpr(instrs::CC.InstructionStream, range::CC.StmtRange) = new(
         instrs.stmt,
@@ -90,9 +89,7 @@ mutable struct IrToExpr
         instrs.flag,
         range,
         fill(false, length(instrs.stmt)),
-        1,
-        0,
-        false
+        1
     )
 
 end
@@ -120,19 +117,15 @@ function get_root_expr!(irtoexpr::IrToExpr)
         markinstruction!(irtoexpr, index)
 
         instr_index = irtoexpr.range.start + index - 1
-        instruction = irtoexpr.instructions[instr_index]
-        type = irtoexpr.types[instr_index]
-
-        if instruction !== nothing
-            push!(toplevel_exprs, ir_to_expr!(irtoexpr, instruction, type))
-        end
+        expr = ir_to_expr!(irtoexpr, CC.SSAValue(instr_index))
+        push!(toplevel_exprs, expr)
     end
 
-    return IRExpr(:theta, reverse(toplevel_exprs), nothing, nothing)
+    return IRExpr(:theta, reverse(toplevel_exprs), nothing, nothing, false)
 end
 
 function ir_to_expr!(irtoexpr::IrToExpr, s::CC.SSAValue)
-    irtoexpr.current_index = s.id
+    irtoexpr.ssa_index = s.id
 
     if s.id < irtoexpr.range.start || s.id > irtoexpr.range.stop
         return s
@@ -149,16 +142,7 @@ end
 ir_to_expr!(_::IrToExpr, x) = x
 
 function ir_to_expr!(irtoexpr::IrToExpr, r::GlobalRef, t)
-    return IRExpr(:ref, [r], GlobalRef, irtoexpr.current_index)
-end
-
-function ir_to_expr!(irtoexpr::IrToExpr, p::CC.PiNode, t)
-    return IRExpr(
-        :pi,
-        [ir_to_expr!(irtoexpr, p.val)],
-        p.typ,
-        irtoexpr.current_index
-    )
+    return IRExpr(:ref, [r], GlobalRef, irtoexpr.ssa_index, false)
 end
 
 function ir_to_expr!(irtoexpr::IrToExpr, r::CC.ReturnNode, t)
@@ -166,15 +150,15 @@ function ir_to_expr!(irtoexpr::IrToExpr, r::CC.ReturnNode, t)
         :ret,
         [ir_to_expr!(irtoexpr, r.val)],
         t,
-        irtoexpr.current_index
+        irtoexpr.ssa_index,
+        false
     )
 end
 
 function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
     if e.head == :invoke
-        flags = irtoexpr.flags[irtoexpr.current_index]
-        effect_free = CC.has_flag(flags, CC.IR_FLAG_EFFECT_FREE)
-        irtoexpr.has_sideeffects |= !effect_free
+        flags = irtoexpr.flags[irtoexpr.ssa_index]
+        has_effects = !CC.has_flag(flags, CC.IR_FLAG_EFFECT_FREE)
 
         return IRExpr(
             Symbol(e.args[1].def.name),
@@ -182,8 +166,10 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
                 ir_to_expr!(irtoexpr, x)
             end,
             t,
-            irtoexpr.current_index
+            irtoexpr.ssa_index,
+            has_effects
         )
+
     end
 
     return IRExpr(
@@ -192,7 +178,8 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
             ir_to_expr!(irtoexpr, x)
         end,
         t,
-        irtoexpr.current_index
+        irtoexpr.ssa_index,
+        false
     )
 end
 
@@ -214,6 +201,7 @@ function push_instr!(exprtoir::ExprToIr, instr, type)
     else
         push!(exprtoir.types, type)
     end
+    return SSAValue(length(exprtoir.instructions) + exprtoir.ssa_start - 1)
 end
 
 expr_to_ir!(_::ExprToIr, x) = x
@@ -230,9 +218,6 @@ function cse_expr_to_ir!(exprtoir::ExprToIr, sym::Symbol, expr::IRExpr)
     exprtoir.cse_env[sym] = ssa_val
 end
 
-function last_ssa_id(exprtoir::ExprToIr)
-    return SSAValue(length(exprtoir.instructions) + exprtoir.ssa_start - 1)
-end
 
 """
     convert_sorted_args!(exprtoir::ExprToIr, args::Vector{Any})
@@ -285,40 +270,36 @@ end
 function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
     if expr.head == :theta
         convert_sorted_args!(exprtoir, expr.args)
-
         return (exprtoir.instructions, exprtoir.types)
     end
 
     if expr.head == :ret
         val = expr_to_ir!(exprtoir, expr.args[1])
-        push_instr!(exprtoir, CC.ReturnNode(val), expr.type)
-        return
+        return push_instr!(exprtoir, CC.ReturnNode(val), expr.type)
     end
 
     if expr.head == :ref
-        push_instr!(exprtoir, expr.args[1], expr.type)
-        return last_ssa_id(exprtoir)
-    end
-
-    if expr.head == :pi
-        val = expr_to_ir!(exprtoir, expr.args[1])
-        push_instr!(exprtoir, CC.PiNode(val, expr.type), expr.type)
-        return last_ssa_id(exprtoir)
+        return push_instr!(exprtoir, expr.args[1], expr.type)
     end
 
     if expr.head == :call
         func = expr_to_ir!(exprtoir, expr.args[1])
         args = convert_sorted_args!(exprtoir, expr.args[2:end])
-        push_instr!(exprtoir, Expr(:call, func, args...), expr.type)
-
-        return last_ssa_id(exprtoir)
+        return push_instr!(exprtoir, Expr(:call, func, args...), expr.type)
     end
 
     func_name = expr.head
     args = convert_sorted_args!(exprtoir, expr.args)
     method = GlobalRef(exprtoir.mod, Symbol(func_name))
 
-    push_instr!(exprtoir, Expr(:call, method, args...), expr.type)
+    instruction = Expr(:call, method, args...)
 
-    return last_ssa_id(exprtoir)
+    if !expr.has_effects
+        index = findlast(x -> x == instruction, exprtoir.instructions)
+        if index !== nothing
+            return SSAValue(exprtoir.ssa_start + index)
+        end
+    end
+
+    return push_instr!(exprtoir, instruction, expr.type)
 end

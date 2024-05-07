@@ -37,5 +37,5 @@ end
 @testset "CommonSubexpressionElimination" begin
     @test tooptimize(MyInt(2)) == MyInt(8)
 
-    @test (@custom Options(ignore_sideeffects=true) rules tooptimize(MyInt(2))) == MyInt(8)
+    @test (@custom Options() rules tooptimize(MyInt(2))) == MyInt(8)
 end
