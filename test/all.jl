@@ -1,0 +1,6 @@
+include("constantfold.jl")
+include("cse.jl")
+include("math.jl")
+include("ordering.jl")
+include("runtests.jl")
+include("trace.jl")
