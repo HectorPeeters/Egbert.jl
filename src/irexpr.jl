@@ -46,7 +46,7 @@ function EGraphs.egraph_reconstruct_expression(
     if metadata !== nothing
         IRExpr(op, args, metadata.type, metadata.order, metadata.has_effects)
     else
-        IRExpr(op, args, nothing, nothing, nothing)
+        IRExpr(op, args, nothing, nothing, false)
     end
 end
 
