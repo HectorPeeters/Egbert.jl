@@ -16,7 +16,9 @@ Replace calls to compilerbarrier wrapper methods with the actual
 implementation. This removes the additional indirection in cases where
 @rewritetarget functions were not optimized.
 """
-function replace_compbarrier_calls!(ir::IRCode, interp::CustomInterpreter)
+function replace_compbarrier_calls!(ir::IRCode, ci::CC.CodeInfo, sv::CC.OptimizationState)
+    interp = sv.inlining.interp
+
     # List of all compilerbarrier wrapper methods
     wrapper_methods = []
 
@@ -55,6 +57,13 @@ function replace_compbarrier_calls!(ir::IRCode, interp::CustomInterpreter)
             if is_invoke(instruction, Symbol(method.def.name))
                 params = instruction.args[begin].def.sig.parameters[begin+1:end]
                 ret_type = ir.stmts.type[i]
+                if ret_type isa Core.Const
+                    ret_type = typeof(ret_type.val)
+                elseif ret_type isa Core.PartialStruct
+                    ret_type = ret_type.typ
+                end
+
+                ir.stmts.type[i] = ret_type
 
                 # Get a reference to the actual implementation
                 impl_func_name = get_impl_function_name(method.def.name)
