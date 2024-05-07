@@ -48,8 +48,8 @@ function build_optimization_pipeline()
         CC.compact!(ir, true) |> pass_changed)
 
     # Cleanup calls to compiler barrier functions
-    CC.register_pass!(pm, "cleanup", (ir, ci, sv) ->
-        replace_compbarrier_calls!(ir, sv.inlining.interp))
+    # CC.register_pass!(pm, "cleanup",
+    # replace_compbarrier_calls!)
 
     # Perform second pass of normal optimization pipeline
     CC.register_pass!(pm, "inlining", (ir, ci, sv) ->
