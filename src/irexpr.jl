@@ -169,7 +169,6 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
             irtoexpr.ssa_index,
             has_effects
         )
-
     end
 
     return IRExpr(

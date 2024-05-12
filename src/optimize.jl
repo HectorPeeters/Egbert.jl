@@ -22,7 +22,7 @@ function perform_rewrites!(
 
     # Currently, we only support functions with a single block
     if length(cfg.blocks) != 1
-        @debug "Skipping function with multiple blocks: $(size(cfg.blocks))"
+        @debug "Skipping function `$(ci.parent.def.name)` with multiple blocks: $(size(cfg.blocks))"
         return ir, false
     end
 
