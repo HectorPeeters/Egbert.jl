@@ -2,8 +2,6 @@
 
 using GpuOptim: @custom, @rewritetarget, Options
 using Test: @testset, @test
-using LinearAlgebra: diag, sum, transpose
-using BenchmarkTools
 using Metatheory
 
 global check_order = []
