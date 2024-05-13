@@ -47,24 +47,24 @@ function build_optimization_pipeline()
     CC.register_condpass!(pm, "compact 3", (ir, _, _) ->
         CC.compact!(ir, true) |> pass_changed)
 
-    CC.register_fixedpointpass!(pm, "fixed point", pass_group(let pm = CC.PassManager()
-        # Perform rewrite optimizations until fixedpoint is reached
-        CC.register_pass!(pm, "rewrite", (ir, ci, sv) ->
-            perform_rewrites!(ir, ci, sv.inlining.interp))
-        CC.register_condpass!(pm, "compact 4", (ir, _, _) ->
-            CC.compact!(ir, true) |> pass_changed)
+    CC.register_fixedpointpass!(pm, "fixed point", function (ir, ci, sv)
+        # Perform rewrite optimizations
+        ir, rewrote = perform_rewrites!(ir, ci, sv.inlining.interp)
+        if rewrote
+            ir = CC.compact!(ir, true)
+        end
 
         # Cleanup calls to compiler barrier functions
-        CC.register_condpass!(pm, "cleanup",
-            replace_compbarrier_calls!)
+        ir, cleanedup = replace_compbarrier_calls!(ir, ci, sv)
 
-        # Perform second pass of normal optimization pipeline
-        CC.register_condpass!(pm, "inlining", (ir, ci, sv) ->
-            CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds))
-        CC.register_condpass!(pm, "compact 2", (ir, _, _) ->
-            CC.compact!(ir) |> pass_changed)
-        pm
-    end))
+        # Perform inlining and compact if we were able to clean up
+        if cleanedup
+            ir, _ = CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds)
+            ir = CC.compact!(ir)
+        end
+
+        return ir, (rewrote || cleanedup)
+    end)
 
     CC.register_pass!(pm, "SROA", (ir, _, sv) ->
         CC.sroa_pass!(ir, sv.inlining) |> pass_changed)
