@@ -40,7 +40,7 @@ end
 
 x = 1:1000
 
-@gen_expression(100)
+@gen_expression(256)
 
 println("Generated expression, running benchmark..")
 
@@ -51,5 +51,8 @@ opt_options = Options(enable_caching=false, dont_run=true)
 
 @btime (@custom default_options math_identities expression())
 @btime (@custom opt_options math_identities expression())
+
+@btime (@custom Options(opt_pipeline=Core.Compiler.default_opt_pipeline()) math_identities expression())
+@btime (@custom Options() math_identities expression())
 
 println("Done!")
