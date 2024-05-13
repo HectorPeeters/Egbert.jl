@@ -296,7 +296,7 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
     if !expr.has_effects
         index = findlast(x -> x == instruction, exprtoir.instructions)
         if index !== nothing
-            return SSAValue(exprtoir.ssa_start + index)
+            return SSAValue(exprtoir.ssa_start + index - 1)
         end
     end
 
