@@ -37,9 +37,14 @@ function perform_rewrites!(
         g = EGraph(irexpr; keepmeta=true)
         settermtype!(g, IRExpr)
 
+        # Determine the cost of our starting expression
+        analyze!(g, interp.options.analysis_ref, g.root)
+        cost_before = getfield(g[g.root].data, interp.options.analysis_name).x[2]
+
         # Saturate the e-graph using the rewrite rules defined in the macro call
         sat_result = saturate!(g, interp.rules, interp.options.saturation_params)
 
+        # Print the saturation results when configured
         if interp.options.print_sat_info
             println(sat_result)
         end
@@ -47,13 +52,21 @@ function perform_rewrites!(
         # Perform e-graph analysis using the specified analysis function
         analyze!(g, interp.options.analysis_ref, g.root)
 
-        # Extract the optimal expression based on the analysis function
-        result = extract!(g, interp.options.analysis_ref)
+        # Determine the cost after saturation
+        cost_after = getfield(g[g.root].data, interp.options.analysis_name).x[2]
+
+        # Print the change in cost when configured
+        if interp.options.print_ast_cost
+            println("AST cost: ", cost_before, " -> ", cost_after)
+        end
 
         # Continue if no changes were made
-        result == irexpr && continue
+        cost_before == cost_after && continue
 
         made_changes = true
+
+        # Extract the optimal expression based on the analysis function
+        result = extract!(g, interp.options.analysis_ref)
 
         # Extract the optimized expression from the e-graph
         exprtoir = ExprToIr(ci.parent.def.module, block.stmts)
