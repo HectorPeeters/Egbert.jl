@@ -78,12 +78,3 @@ end
         isapprox(optimized, expected)
     end
 end
-
-# io = IOContext(stdout, :logbins => true)
-
-# noopt = @benchmark tooptimize($A, $B)
-# show(io, MIME("text/plain"), noopt)
-# println()
-
-# opt = @benchmark (@custom Options() rules tooptimize($A, $B))
-# show(io, MIME("text/plain"), opt)
