@@ -172,8 +172,8 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
     end
 
     return IRExpr(
-        e.head,
-        map(enumerate(e.args)) do (i, x)
+        e.args[1].name,
+        map(enumerate(e.args[2:end])) do (i, x)
             ir_to_expr!(irtoexpr, x)
         end,
         t,
