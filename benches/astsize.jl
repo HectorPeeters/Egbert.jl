@@ -1,4 +1,4 @@
-using GpuOptim: @custom, @rewritetarget, Options
+using GpuOptim: @custom, @rewritetarget, Options, math_identities
 using Test: @testset, @test
 using Metatheory
 using BenchmarkTools: @benchmark, @btime
@@ -6,8 +6,10 @@ using BenchmarkTools: @benchmark, @btime
 @rewritetarget add(a, b)::Integer = a + b
 @rewritetarget sub(a, b)::Integer = a - b
 @rewritetarget mul(a, b)::Integer = a * b
+@rewritetarget pow(a, b)::Integer = a^b
 
 macro gen_expression(n::Integer)
+    operators = [:add, :sub, :mul, :div]
     operands = [Expr(:ref, Symbol("x"), i) for i in 1:2*n]
 
     opi = 0
@@ -15,13 +17,19 @@ macro gen_expression(n::Integer)
     function rand_expr(nodes)
         if nodes <= 1
             opi += 1
-            return operands[opi]
+            if opi % 5 <= 2
+                return opi
+            else
+                return operands[opi]
+            end
         else
-            return Expr(:call, :add, rand_expr(nodes / 2), rand_expr(nodes / 2))
+            return Expr(:call, operators[opi%4+1], rand_expr(nodes / 2), rand_expr(nodes / 2))
         end
     end
 
     expr = rand_expr(n)
+
+    println(opi)
 
     return esc(quote
         function expression()
@@ -30,30 +38,18 @@ macro gen_expression(n::Integer)
     end)
 end
 
-rules = @theory a b c begin
-    add(a, b) == add(b, a)
-    add(a, add(b, c)) == add(add(a, b), c)
-    add(a, 0) == a
+x = 1:1000
 
-    add(a, a) == mul(a, 2)
-
-    mul(a, b) == mul(b, a)
-    mul(a, mul(b, c)) == mul(mul(a, b), c)
-    mul(a, 1) == a
-end
-
-x = 1:400
-
-@gen_expression(200)
+@gen_expression(100)
 
 println("Generated expression, running benchmark..")
 
-@test (@custom Options() rules expression()) == expression()
+@test (@custom Options(print_ast_cost=true) math_identities expression()) == expression()
 
 default_options = Options(opt_pipeline=Core.Compiler.default_opt_pipeline(), enable_caching=false, dont_run=true)
 opt_options = Options(enable_caching=false, dont_run=true)
 
-@btime (@custom default_options rules expression())
-@btime (@custom opt_options rules expression())
+@btime (@custom default_options math_identities expression())
+@btime (@custom opt_options math_identities expression())
 
 println("Done!")
