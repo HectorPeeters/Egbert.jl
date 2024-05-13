@@ -5,6 +5,8 @@
 Log the IR code of a function if it is in the Main module.
 """
 function logir(ir, _, sv)
+    sv.inlining.interp.options.log_ir || return (ir, false)
+
     # Only log functions in the Main module
     if nameof(sv.src.parent.def.module) == :Main
         println("Function: ", sv.src.parent.def)
@@ -65,7 +67,7 @@ function build_optimization_pipeline()
         CC.compact!(ir, true) |> pass_changed)
 
     # Log the result of the optimizations
-    # CC.register_pass!(pm, "log", logir)
+    CC.register_pass!(pm, "log", logir)
 
     if CC.is_asserts()
         CC.register_pass!(pm, "verify", (ir, _, sv) -> begin

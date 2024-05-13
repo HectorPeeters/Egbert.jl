@@ -23,7 +23,11 @@ macro custom(options, rules, ex::Expr)
         options = $(esc(options))
         obj = custom_compiler(ft, types, options, rules)
 
-        obj(args...)
+        if options.dont_run
+            obj, args
+        else
+            obj(args...)
+        end
     end
 end
 
@@ -44,23 +48,16 @@ function custom_compiler(ft, types, options::Options, rules::Any)
         options=options,
         rules=rules)
 
+    if !options.enable_caching
+        irs = Base.code_ircode_by_type(sig; interp)
+        isempty(irs) && throw(MethodError(ft, tt, world))
+        ir, _ = only(irs)
+        return OpaqueClosure(ir)
+    end
+
     match, _ = CC._findsup(sig, nothing, world)
     match === nothing && throw(MethodError(ft, tt, world))
     mi = CC.specialize_method(match)
-
-    wvc = CC.code_cache(interp)
-
-    cached = CC.get(wvc, mi, nothing)
-    if cached !== nothing
-        src = @atomic :monotonic cached.inferred
-        if isa(src, String)
-            src = CC._uncompressed_ir(mi.def, src)
-        else
-            isa(src, CC.CodeInfo) || return nothing
-        end
-        ir = CC.inflate_ir(src, mi)
-        return OpaqueClosure(ir)
-    end
 
     inferred = CC.typeinf_ext_toplevel(interp, mi)
     return OpaqueClosure(inferred)

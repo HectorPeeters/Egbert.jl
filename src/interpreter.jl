@@ -4,12 +4,30 @@ using Metatheory: astsize, SaturationParams
 struct Options
     analysis_ref::Function
     saturation_params::SaturationParams
+    opt_pipeline::CC.PassManager
+    enable_caching::Bool
+    dont_run::Bool
+    print_sat_info::Bool
+    log_ir::Bool
 
     function Options(;
         analysis_ref=astsize,
-        saturation_params=SaturationParams()
+        saturation_params=SaturationParams(),
+        opt_pipeline=build_optimization_pipeline(),
+        enable_caching=true,
+        dont_run=false,
+        print_sat_info=false,
+        log_ir=false
     )
-        new(analysis_ref, saturation_params)
+        new(
+            analysis_ref,
+            saturation_params,
+            opt_pipeline,
+            enable_caching,
+            dont_run,
+            print_sat_info,
+            log_ir
+        )
     end
 end
 
@@ -25,7 +43,6 @@ mutable struct CustomInterpreter <: CC.AbstractInterpreter
     opt_params::CC.OptimizationParams
 
     frame_cache::Vector{CC.InferenceState}
-    opt_pipeline::CC.PassManager
 
     rules::Any
     options::Options
@@ -41,7 +58,6 @@ mutable struct CustomInterpreter <: CC.AbstractInterpreter
         inf_cache = Vector{CC.InferenceResult}()
 
         frame_cache = Vector{CC.InferenceState}()
-        opt_pipeline = build_optimization_pipeline()
 
         return new(
             world,
@@ -50,7 +66,6 @@ mutable struct CustomInterpreter <: CC.AbstractInterpreter
             inf_params,
             opt_params,
             frame_cache,
-            opt_pipeline,
             rules,
             options
         )
@@ -65,7 +80,7 @@ CC.get_inference_cache(interp::CustomInterpreter) = interp.inf_cache
 CC.code_cache(interp::CustomInterpreter) = CC.WorldView(interp.code_cache, interp.world)
 CC.cache_owner(::CustomInterpreter) = CustomInterpreterToken
 
-CC.build_opt_pipeline(interp::CustomInterpreter) = interp.opt_pipeline
+CC.build_opt_pipeline(interp::CustomInterpreter) = interp.options.opt_pipeline
 
 CC.lock_mi_inference(::CustomInterpreter, ::MethodInstance) = nothing
 CC.unlock_mi_inference(::CustomInterpreter, ::MethodInstance) = nothing
