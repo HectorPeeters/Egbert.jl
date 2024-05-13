@@ -3,30 +3,36 @@ using Metatheory: astsize, SaturationParams
 
 struct Options
     analysis_ref::Function
+    analysis_name::Symbol
     saturation_params::SaturationParams
     opt_pipeline::CC.PassManager
     enable_caching::Bool
     dont_run::Bool
     print_sat_info::Bool
     log_ir::Bool
+    print_ast_cost::Bool
 
     function Options(;
         analysis_ref=astsize,
+        analysis_name=:astsize,
         saturation_params=SaturationParams(),
         opt_pipeline=build_optimization_pipeline(),
         enable_caching=true,
         dont_run=false,
         print_sat_info=false,
-        log_ir=false
+        log_ir=false,
+        print_ast_cost=false
     )
         new(
             analysis_ref,
+            analysis_name,
             saturation_params,
             opt_pipeline,
             enable_caching,
             dont_run,
             print_sat_info,
-            log_ir
+            log_ir,
+            print_ast_cost
         )
     end
 end
