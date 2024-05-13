@@ -9,5 +9,6 @@ include("wrapper.jl")
 include("pipeline.jl")
 include("cleanup.jl")
 include("interface.jl")
+include("rules.jl")
 
 end
