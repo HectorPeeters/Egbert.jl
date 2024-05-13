@@ -42,7 +42,6 @@ function replace_compbarrier_calls!(ir::IRCode, ci::CC.CodeInfo, sv::CC.Optimiza
                get_impl_function_name(mi.def.name) == first_instr.args[begin].def.name
                 push!(wrapper_methods, mi)
                 break
-
             end
         end
     end
@@ -57,10 +56,10 @@ function replace_compbarrier_calls!(ir::IRCode, ci::CC.CodeInfo, sv::CC.Optimiza
             if is_invoke(instruction, Symbol(method.def.name))
                 params = instruction.args[begin].def.sig.parameters[begin+1:end]
                 ret_type = ir.stmts.type[i]
-                if ret_type isa Core.Const
-                    ret_type = typeof(ret_type.val)
-                elseif ret_type isa Core.PartialStruct
-                    ret_type = ret_type.typ
+
+                # TODO: add support for PartialStruct and Const return types
+                if ret_type isa Core.PartialStruct || ret_type isa Core.Const
+                    continue
                 end
 
                 ir.stmts.type[i] = ret_type
