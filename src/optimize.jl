@@ -38,7 +38,11 @@ function perform_rewrites!(
         settermtype!(g, IRExpr)
 
         # Saturate the e-graph using the rewrite rules defined in the macro call
-        saturate!(g, interp.rules, interp.options.saturation_params)
+        sat_result = saturate!(g, interp.rules, interp.options.saturation_params)
+
+        if interp.options.print_sat_info
+            println(sat_result)
+        end
 
         # Perform e-graph analysis using the specified analysis function
         analyze!(g, interp.options.analysis_ref, g.root)
