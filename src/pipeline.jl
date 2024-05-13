@@ -23,6 +23,10 @@ Helper function to indicate that a pass has changed the IR code.
 """
 pass_changed(x) = (x, true)
 
+function pass_group(pm::CC.PassManager)
+    return (ir::IRCode, ci::CC.CodeInfo, sv::OptimizationState) -> CC.run_passes(pm, ir, ci, sv)
+end
+
 function build_optimization_pipeline()
     pm = CC.PassManager()
 
@@ -43,21 +47,24 @@ function build_optimization_pipeline()
     CC.register_condpass!(pm, "compact 3", (ir, _, _) ->
         CC.compact!(ir, true) |> pass_changed)
 
-    # Perform rewrite optimizations until fixedpoint is reached
-    CC.register_pass!(pm, "rewrite", (ir, ci, sv) ->
-        perform_rewrites!(ir, ci, sv.inlining.interp))
-    CC.register_condpass!(pm, "compact 4", (ir, _, _) ->
-        CC.compact!(ir, true) |> pass_changed)
+    CC.register_fixedpointpass!(pm, "fixed point", pass_group(let pm = CC.PassManager()
+        # Perform rewrite optimizations until fixedpoint is reached
+        CC.register_pass!(pm, "rewrite", (ir, ci, sv) ->
+            perform_rewrites!(ir, ci, sv.inlining.interp))
+        CC.register_condpass!(pm, "compact 4", (ir, _, _) ->
+            CC.compact!(ir, true) |> pass_changed)
 
-    # Cleanup calls to compiler barrier functions
-    CC.register_pass!(pm, "cleanup",
-        replace_compbarrier_calls!)
+        # Cleanup calls to compiler barrier functions
+        CC.register_condpass!(pm, "cleanup",
+            replace_compbarrier_calls!)
 
-    # Perform second pass of normal optimization pipeline
-    CC.register_pass!(pm, "inlining", (ir, ci, sv) ->
-        CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds))
-    CC.register_pass!(pm, "compact 2", (ir, _, _) ->
-        CC.compact!(ir) |> pass_changed)
+        # Perform second pass of normal optimization pipeline
+        CC.register_condpass!(pm, "inlining", (ir, ci, sv) ->
+            CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds))
+        CC.register_condpass!(pm, "compact 2", (ir, _, _) ->
+            CC.compact!(ir) |> pass_changed)
+        pm
+    end))
 
     CC.register_pass!(pm, "SROA", (ir, _, sv) ->
         CC.sroa_pass!(ir, sv.inlining) |> pass_changed)
