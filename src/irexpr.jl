@@ -146,9 +146,19 @@ function ir_to_expr!(irtoexpr::IrToExpr, r::GlobalRef, t)
 end
 
 function ir_to_expr!(irtoexpr::IrToExpr, r::CC.ReturnNode, t)
+    if isdefined(r, :val)
+        return IRExpr(
+            :ret,
+            [ir_to_expr!(irtoexpr, r.val)],
+            t,
+            irtoexpr.ssa_index,
+            false
+        )
+    end
+
     return IRExpr(
         :ret,
-        [ir_to_expr!(irtoexpr, r.val)],
+        [],
         t,
         irtoexpr.ssa_index,
         false
@@ -273,6 +283,10 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
     end
 
     if expr.head == :ret
+        if length(expr.args) == 0
+            return push_instr!(exprtoir, CC.ReturnNode(), expr.type)
+        end
+
         val = expr_to_ir!(exprtoir, expr.args[1])
         return push_instr!(exprtoir, CC.ReturnNode(val), expr.type)
     end
