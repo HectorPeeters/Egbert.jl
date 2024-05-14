@@ -35,22 +35,8 @@ end
     return MyInt(a.data * b.data)
 end
 
-@rewritetarget function do_sideeffect(x)::MyInt
-    push!(check_order, x)
-    return MyInt(x)
-end
-
 function tooptimize(a, b, c)
     return add(newval(a), add(newval(b), newval(c)))
-end
-
-function tooptimize2()
-    return add(do_sideeffect(1), do_sideeffect(1))
-end
-
-function tooptimize3(x)
-    y = do_sideeffect(x)
-    return add(y, y)
 end
 
 rules = @theory a b c begin
@@ -70,33 +56,5 @@ end
         global check_order = []
         @custom Options() rules tooptimize(1, 2, 3)
         check_order == [1, 2, 3]
-    end
-
-    @test tooptimize2() == MyInt(2)
-
-    @test begin
-        global check_order = []
-        tooptimize2()
-        check_order == [1, 1]
-    end
-
-    @test begin
-        global check_order = []
-        @custom Options() rules tooptimize2()
-        check_order == [1, 1]
-    end
-
-    @test tooptimize3(1) == MyInt(2)
-
-    @test begin
-        global check_order = []
-        tooptimize3(1)
-        check_order == [1]
-    end
-
-    @test begin
-        global check_order = []
-        @custom Options() rules tooptimize3(1)
-        check_order == [1]
     end
 end

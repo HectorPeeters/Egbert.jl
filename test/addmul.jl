@@ -1,6 +1,6 @@
 # A simple example of a rewrite test
 
-using GpuOptim: @custom, @rewritetarget, Options
+using GpuOptim: @custom, @rewritetarget, @rewritetarget_ef, Options
 using Test: @testset, @test
 using Metatheory
 
@@ -12,7 +12,7 @@ function perform_add(a::CustomList, b::CustomList)::CustomList
     return CustomList(a.data .+ b.data)
 end
 
-@rewritetarget function add(a::CustomList, b::CustomList)::CustomList
+@rewritetarget_ef function add(a::CustomList, b::CustomList)::CustomList
     return perform_add(a, b)
 end
 
@@ -21,7 +21,7 @@ function perform_mul(a::CustomList, b::CustomList)::CustomList
     return CustomList(a.data .* b.data)
 end
 
-@rewritetarget function mul(a::CustomList, b::CustomList)::CustomList
+@rewritetarget_ef function mul(a::CustomList, b::CustomList)::CustomList
     return perform_mul(a, b)
 end
 

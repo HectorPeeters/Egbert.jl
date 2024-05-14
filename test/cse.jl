@@ -1,6 +1,6 @@
 # Tests showing the common subexpression elimination capabilities
 
-using GpuOptim: @custom, @rewritetarget, Options
+using GpuOptim: @custom, @rewritetarget_ef, Options
 using Test: @testset, @test
 using LinearAlgebra: diag, sum, transpose
 using BenchmarkTools
@@ -9,18 +9,18 @@ using Metatheory
 struct MyInt
     data::Integer
 
-    @rewritetarget MyInt(x::Integer)::MyInt = new(x)
+    @rewritetarget_ef MyInt(x::Integer)::MyInt = new(x)
 end
 
 function Base.:(==)(a::MyInt, b::MyInt)
     return a.data == b.data
 end
 
-@rewritetarget function add(a::MyInt, b::MyInt)::MyInt
+@rewritetarget_ef function add(a::MyInt, b::MyInt)::MyInt
     return MyInt(a.data + b.data)
 end
 
-@rewritetarget function mul(a::MyInt, b::MyInt)::MyInt
+@rewritetarget_ef function mul(a::MyInt, b::MyInt)::MyInt
     return MyInt(a.data * b.data)
 end
 

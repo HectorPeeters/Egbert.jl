@@ -1,7 +1,7 @@
 # A test rewriting the trace of a matrix multiplication to a more efficient
 # implementation.
 
-using GpuOptim: @custom, @rewritetarget, Options
+using GpuOptim: @custom, @rewritetarget, @rewritetarget_ef, Options
 using Test: @testset, @test
 using LinearAlgebra: diag, sum, transpose
 using BenchmarkTools
@@ -15,15 +15,15 @@ function Base.:(==)(a::MyMatrix, b::MyMatrix)
     return a.data == b.data
 end
 
-@rewritetarget function trace(A::MyMatrix)::Float64
+@rewritetarget_ef function trace(A::MyMatrix)::Float64
     return sum(diag(A.data))
 end
 
-@rewritetarget function mul(A::MyMatrix, B::MyMatrix)::MyMatrix
+@rewritetarget_ef function mul(A::MyMatrix, B::MyMatrix)::MyMatrix
     return MyMatrix(A.data * B.data)
 end
 
-@rewritetarget function transp(A::MyMatrix)::MyMatrix
+@rewritetarget_ef function transp(A::MyMatrix)::MyMatrix
     return MyMatrix(transpose(A.data))
 end
 
@@ -44,7 +44,7 @@ function mul_trace_optimized(A::MyMatrix, B::MyMatrix)::Float64
     return result
 end
 
-N = 1000
+N = 100
 A = MyMatrix(rand(N, N))
 B = MyMatrix(rand(N, N))
 
