@@ -60,11 +60,6 @@ function perform_rewrites!(
             println("AST cost: ", cost_before, " -> ", cost_after)
         end
 
-        # Continue if no changes were made
-        cost_before == cost_after && continue
-
-        made_changes = true
-
         # Extract the optimal expression based on the analysis function
         result = extract!(g, interp.options.analysis_ref)
 
@@ -73,6 +68,12 @@ function perform_rewrites!(
 
         # Convert the optimized expression back to IR
         (optim_instr, optim_types) = expr_to_ir!(exprtoir, result)
+
+        # NOTE: This is not the best way to check for changes. Initially,
+        #       the cost of the expression was determined but this does
+        #       not take into account the CSE functionality.
+        length(optim_instr) == length(block.stmts) && continue
+        made_changes = true
 
         if length(optim_instr) > length(block.stmts)
             # TODO: we need to resize in the middle of the instruction stream 
@@ -84,19 +85,22 @@ function perform_rewrites!(
 
         # Patch the optimized instructions back into the IR code
         for (i, instr) in enumerate(optim_instr)
-            ir.stmts.stmt[i+block.stmts.start-1] = instr
-            ir.stmts.type[i+block.stmts.start-1] = optim_types[i]
-            ir.stmts.info[i+block.stmts.start-1] = CC.NoCallInfo()
-            ir.stmts.flag[i+block.stmts.start-1] = CC.IR_FLAG_REFINED
+            target_i = i+block.stmts.start-1
+
+            ir.stmts.stmt[target_i] = instr
+            ir.stmts.type[target_i] = optim_types[i]
+            ir.stmts.info[target_i] = CC.NoCallInfo()
+            ir.stmts.flag[target_i] = CC.IR_FLAG_REFINED
         end
 
         # Remove any remaining instructions
         for i in length(optim_instr)+1:length(block.stmts)
-            ir.stmts.stmt[i+block.stmts.start-1] = nothing
-            ir.stmts.type[i+block.stmts.start-1] = Nothing
-            ir.stmts.info[i+block.stmts.start-1] = CC.NoCallInfo()
-            ir.stmts.flag[i+block.stmts.start-1] = CC.IR_FLAG_NULL
-            ir.stmts.line[i+block.stmts.start-1] = 0
+            target_i = i+block.stmts.start-1
+            ir.stmts.stmt[target_i] = nothing
+            ir.stmts.type[target_i] = Nothing
+            ir.stmts.info[target_i] = CC.NoCallInfo()
+            ir.stmts.flag[target_i] = CC.IR_FLAG_NULL
+            ir.stmts.line[target_i] = 0
         end
     end
 
