@@ -52,6 +52,35 @@ macro rewritetarget(func::Expr)
     end)
 end
 
+macro rewritetarget_ef(func::Expr)
+    if func.args[begin].args[begin] isa Symbol
+        return error("Please add a return type to the function")
+    end
+
+    # Full signature of function including name and return type
+    signature = func.args[begin]
+    # Signature of function without return type
+    signature_noret = signature.args[begin]
+
+    func_name = signature_noret.args[begin]
+    args = signature_noret.args[2:end]
+    ret_type = signature.args[2]
+
+    # Change the name of the implementation function
+    func_name_impl = get_impl_function_name(func_name)
+    func.args[begin].args[begin].args[begin] = func_name_impl
+
+    # Return a wrapper around the function that encapsulates the original 
+    # implementation
+    return esc(quote
+        $(func)
+
+        @noinline Base.@assume_effects :effect_free function $func_name($(args...))::$ret_type
+            return $(func_name_impl)($(args...))
+        end
+    end)
+end
+
 """
     strip_compbarrier!(ir::IRCode)
 

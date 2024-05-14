@@ -170,6 +170,17 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
         flags = irtoexpr.flags[irtoexpr.ssa_index]
         has_effects = !CC.has_flag(flags, CC.IR_FLAG_EFFECT_FREE)
 
+        if has_effects
+            @debug "Function has effects: ", e.args[1].def.name
+            return IRExpr(
+                :__effect__,
+                [e, irtoexpr.ssa_index],
+                nothing,
+                irtoexpr.ssa_index,
+                has_effects
+            )
+        end
+
         return IRExpr(
             Symbol(e.args[1].def.name),
             map(enumerate(e.args[3:end])) do (i, x)
@@ -194,22 +205,24 @@ end
 
 struct ExprToIr
     instructions::Vector{Any}
+    source_ssa_ids::Vector{Any}
     types::Vector{Any}
     ssa_start::Integer
     mod::Module
     cse_env::OrderedDict{Symbol,CC.SSAValue}
 
     ExprToIr(mod::Module, range::CC.StmtRange) = new(
-        [], [], range.start, mod, OrderedDict())
+        [], [], [], range.start, mod, OrderedDict())
 end
 
-function push_instr!(exprtoir::ExprToIr, instr, type)
+function push_instr!(exprtoir::ExprToIr, instr, type; source_ssa_id=nothing)
     push!(exprtoir.instructions, instr)
     if type === nothing
         push!(exprtoir.types, Any)
     else
         push!(exprtoir.types, type)
     end
+    push!(exprtoir.source_ssa_ids, source_ssa_id)
     return SSAValue(length(exprtoir.instructions) + exprtoir.ssa_start - 1)
 end
 
@@ -282,6 +295,17 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
         return (exprtoir.instructions, exprtoir.types)
     end
 
+    if expr.head == :__effect__
+        source_ssa_id = expr.args[2]
+
+        index = findlast(x -> x == source_ssa_id, exprtoir.source_ssa_ids)
+        if index !== nothing
+            return SSAValue(exprtoir.ssa_start + index - 1)
+        end
+
+        return push_instr!(exprtoir, expr.args[1], expr.type; source_ssa_id=source_ssa_id)
+    end
+
     if expr.head == :ret
         if length(expr.args) == 0
             return push_instr!(exprtoir, CC.ReturnNode(), expr.type)
@@ -295,23 +319,15 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
         return push_instr!(exprtoir, expr.args[1], expr.type)
     end
 
-    if expr.head == :call
-        func = expr_to_ir!(exprtoir, expr.args[1])
-        args = convert_sorted_args!(exprtoir, expr.args[2:end])
-        return push_instr!(exprtoir, Expr(:call, func, args...), expr.type)
-    end
-
     func_name = expr.head
     args = convert_sorted_args!(exprtoir, expr.args)
     method = GlobalRef(exprtoir.mod, Symbol(func_name))
 
     instruction = Expr(:call, method, args...)
 
-    if !expr.has_effects
-        index = findlast(x -> x == instruction, exprtoir.instructions)
-        if index !== nothing
-            return SSAValue(exprtoir.ssa_start + index - 1)
-        end
+    index = findlast(x -> x == instruction, exprtoir.instructions)
+    if index !== nothing
+        return SSAValue(exprtoir.ssa_start + index - 1)
     end
 
     return push_instr!(exprtoir, instruction, expr.type)
