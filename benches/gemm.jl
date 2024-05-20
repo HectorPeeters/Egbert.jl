@@ -1,61 +1,70 @@
-using GpuOptim: @custom, @rewritetarget, Options
+using GpuOptim: @custom, @rewritetarget_ef, Options
 using Test: @testset, @test
-using LinearAlgebra: diag, sum, transpose
-using MetaTheory
-using GemmKernels
+using LinearAlgebra: sum, transpose, tr
+using LinearAlgebra.BLAS: gemm
+using BenchmarkTools
+using Metatheory
+using CSV
+using Tables
+using Statistics
 
 struct MyMatrix
-    data::Matrix{Float64}
+    data::Matrix
 end
 
 function Base.:(==)(a::MyMatrix, b::MyMatrix)
-    return a.data == b.data
+    return a.data .== b.data
 end
 
-@rewritetarget function add(A::MyMatrix, B::MyMatrix)::MyMatrix
+@rewritetarget_ef function add(A::MyMatrix, B::MyMatrix)::MyMatrix
     return MyMatrix(A.data + B.data)
 end
 
-@rewritetarget function mul(A::MyMatrix, B::MyMatrix)::MyMatrix
+@rewritetarget_ef function mul(A::MyMatrix, B::MyMatrix)::MyMatrix
     return MyMatrix(A.data * B.data)
 end
 
-@rewritetarget function transp(A::MyMatrix)::MyMatrix
+@rewritetarget_ef function transp(A::MyMatrix)::MyMatrix
     return MyMatrix(transpose(A.data))
 end
 
-function gemm(A::MyMatrix, B::MyMatrix, transpa::Bool=false, transpb::Bool=false)::MyMatrix
-    conf = GemmKernelGemmKernelss.get_config(
-        gemm_shape=(M=1024, N=1024, K=1024),
-        operator=Operator.WMMAOp{16,16,16,Float32},
-        global_a_layout=transpa ? Layout.UnsafeAlignedRowMajor{Float64} : Layout.UnsafeAlignedColMajor{Float64},
-        global_b_layout=transpb ? Layout.UnsafeAlignedRowMajor{Float64} : Layout.UnsafeAlignedColMajor{Float64},
-        global_c_layout=Layout.UnsafeAlignedColMajor{Float64},
-        global_d_layout=Layout.UnsafeAlignedColMajor{Float32},
-        is_a_col_major=!transpa,
-        is_b_col_major=!transpb,
-    )
-
-    C = MyMatrix(zero(1024, 1024))
-
-    GemmKernels.matmul(A.data, B.data, C.data, C.data, conf; kernel=Kernel.matmul_pipelined)
-
-    return C
+@rewritetarget_ef function mul_optimized(A::MyMatrix, B::MyMatrix)::MyMatrix
+    return MyMatrix(gemm('T', 'N', A.data, B.data))
 end
 
-@testset "Gemm Optimization" begin
-    A = rand(1024, 1024)
-    B = rand(1024, 1024)
+function tooptimize(A::MyMatrix, B::MyMatrix)
+    return mul(transp(A), B)
+end
 
-    rules = @theory a b c d e begin
-        mul(a, b) == mul(b, a)
-        mul(a, b) --> gemm(a, b)
-        mul(tansp(a), b) --> gemm(a, b, true, false)
-        mul(tansp(a), transp(b)) --> gemm(a, b, true, true)
-    end
+rules = @theory A B begin
+    mul(A, B) --> mul_optimized(A, B, 'N', 'N')
+    mul(transp(A), B) --> mul_optimized(A, B)
+    mul(A, transp(B)) --> mul_optimized(A, B, 'N', 'T')
+    mul(transp(A), transp(B)) --> mul_optimized(A, B, 'T', 'T')
+end
 
-    @test mul(A, B) == gemm(A, B)
-    @test mul(transp(A), B) == gemm(A, B, true)
-    @test mul(A, transp(B)) == gemm(A, B, false, true)
-    @test mul(transp(A), transp(B)) == gemm(A, B, true, true)
+xs = Float64[]
+ys = Float64[]
+ys_slow = Float64[]
+
+for i in range(1, stop=5000, length=20)
+    println("Running for n = ", i)
+
+    n = floor(Int, i)
+    A = rand(n, n)
+    B = rand(n, n)
+    myA = MyMatrix(A)
+    myB = MyMatrix(B)
+
+    # @test tooptimize(myA, myB) == transpose(A) * B
+    # @test (@custom Options() tooptimize(myA, myB)) == transpose(A) * B
+    t = @benchmark (@custom Options() rules tooptimize($myA, $myB))
+    tslow = @benchmark tooptimize($myA, $myB)
+
+    push!(xs, n)
+    push!(ys, mean(t).time)
+    push!(ys_slow, mean(tslow).time)
+
+    data = hcat(xs, ys_slow, ys)
+    CSV.write("gemm.csv", Tables.table(data), header=["x", "y", "y-custom"])
 end
