@@ -107,6 +107,77 @@ function fib(n)
     return fib(n - 1) + fib(n - 2)
 end
 
+function matmul(n)
+    A = rand(n, n)
+    B = rand(n, n)
+    return A * B
+end
+
+function sortfunc(n)
+    xs = rand(n)
+    return sort(xs)
+end
+
+function gcd(a, b)
+    while a != b
+        if a > b
+            a -= b
+        else
+            b -= a
+        end
+    end
+
+    return a
+end
+
+name = []
+normal = []
+custom = []
+normal_mem = []
+custom_mem = []
+
+println("Benchmarking fibonacci")
+push!(name, "fibonacci")
+normal_result = mean(@benchmark(fib($35)))
+custom_result = mean(@benchmark(@custom fib($35)))
+push!(normal, normal_result.time)
+push!(custom, custom_result.time)
+push!(normal_mem, normal_result.memory)
+push!(custom_mem, custom_result.memory)
+
+println("Benchmarking matmul")
+push!(name, "matmul")
+normal_result = mean(@benchmark(matmul($1024)))
+custom_result = mean(@benchmark(@custom matmul($1024)))
+push!(normal, normal_result.time)
+push!(custom, custom_result.time)
+push!(normal_mem, normal_result.memory)
+push!(custom_mem, custom_result.memory)
+
+println("Benchmarking sort")
+push!(name, "sort")
+normal_result = mean(@benchmark(sortfunc($1000000)))
+custom_result = mean(@benchmark(@custom sortfunc($1000000)))
+push!(normal, normal_result.time)
+push!(custom, custom_result.time)
+push!(normal_mem, normal_result.memory)
+push!(custom_mem, custom_result.memory)
+
+println("Benchmarking gcd")
+push!(name, "gcd")
+normal_result = mean(@benchmark(gcd($10000000, $9999999)))
+custom_result = mean(@benchmark(@custom gcd($10000000, $9999999)))
+push!(normal, normal_result.time)
+push!(custom, custom_result.time)
+push!(normal_mem, normal_result.memory)
+push!(custom_mem, custom_result.memory)
+
+CSV.write(
+    "interp-overhead-means.csv",
+    Tables.table(hcat(name, normal, custom, normal_mem, custom_mem)),
+    header=["name", "normal-time", "custom-time", "normal-mem", "custom-mem"]
+)
+
 xs = []
 ys = []
 ys_custom = []
@@ -118,5 +189,5 @@ for i in 41:50
     push!(ys_custom, mean(@benchmark(@custom fib($i))).time)
 
     data = hcat(xs, ys, ys_custom)
-    CSV.write("output.csv", Tables.table(data), header=["x", "y", "y-custom"])
+    CSV.write("inter-overhead-fib.csv", Tables.table(data), header=["x", "y", "y-custom"])
 end
