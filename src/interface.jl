@@ -8,6 +8,7 @@ const global_ci_cache = CodeCache()
 Execute a function call using the e-graph optimization pipeline.
 """
 # TODO: this macro should get a better name
+export custom
 macro custom(options, rules, ex::Expr)
     Meta.isexpr(ex, :call) || error("not a function call")
     f, args... = ex.args
