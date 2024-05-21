@@ -28,17 +28,29 @@ end
     return MyMatrix(transpose(A.data))
 end
 
-@rewritetarget_ef function mul_optimized(A::MyMatrix, B::MyMatrix)::MyMatrix
-    return MyMatrix(gemm('T', 'N', A.data, B.data))
+@rewritetarget_ef function mul_optimized(A::MyMatrix, B::MyMatrix, ta::Bool, tb::Bool)::MyMatrix
+    return MyMatrix(gemm(ta, tb, A.data, B.data))
+end
+
+@rewritetarget_ef function addmul_optimized(A::MyMatrix, B::MyMatrix, C::MyMatrix)::MyMatrix
+    return MyMatrix(gemm!('N', 'N', 1, A.data, B.data, 1, C))
 end
 
 function tooptimize(A::MyMatrix, B::MyMatrix)
     return mul(transp(A), B)
 end
 
-rules = @theory A B begin
+function tooptimize2(A::MyMatrix, B::MyMatrix, C::MyMatrix)
+    return add(mul(A, B), C)
+end
+
+rules = @theory A B C begin
+    add(A, B) == add(B, A)
+
+    add(mul(A, B), C) --> addmul_optimized(A, B, C)
+
     mul(A, B) --> mul_optimized(A, B, 'N', 'N')
-    mul(transp(A), B) --> mul_optimized(A, B)
+    mul(transp(A), B) --> mul_optimized(A, B, 'T', 'N')
     mul(A, transp(B)) --> mul_optimized(A, B, 'N', 'T')
     mul(transp(A), transp(B)) --> mul_optimized(A, B, 'T', 'T')
 end
