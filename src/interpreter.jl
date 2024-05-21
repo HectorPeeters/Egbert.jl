@@ -1,6 +1,7 @@
 using .Core.Compiler: OptimizationState, InferenceResult, InferenceState
 using Metatheory: astsize, SaturationParams
 
+export Options
 struct Options
     analysis_ref::Function
     analysis_name::Symbol
