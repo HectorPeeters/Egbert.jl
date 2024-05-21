@@ -32,7 +32,6 @@ end
 
 @test tooptimize(12, 13) == 625
 
-
 @test (@custom Options() math_identities tooptimize(12, 13)) == 625
 
 for i in 25:35
