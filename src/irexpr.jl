@@ -192,6 +192,16 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
         )
     end
 
+    if e.head == :foreigncall
+        return IRExpr(
+            :__foreigncall__,
+            [e, irtoexpr.ssa_index],
+            nothing,
+            irtoexpr.ssa_index,
+            true,
+        )
+    end
+
     return IRExpr(
         e.args[1].name,
         map(enumerate(e.args[2:end])) do (i, x)
@@ -302,6 +312,12 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
         if index !== nothing
             return SSAValue(exprtoir.ssa_start + index - 1)
         end
+
+        return push_instr!(exprtoir, expr.args[1], expr.type; source_ssa_id=source_ssa_id)
+    end
+
+    if expr.head == :__foreigncall__
+        source_ssa_id = expr.args[2]
 
         return push_instr!(exprtoir, expr.args[1], expr.type; source_ssa_id=source_ssa_id)
     end
