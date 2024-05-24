@@ -11,7 +11,9 @@ Perform e-graph rewrite optimizations on the given IR code using the specified
 rules.
 """
 function perform_rewrites!(
-    ir::IRCode, ci::CC.CodeInfo, interp::CustomInterpreter)
+    ir::IRCode, ci::CC.CodeInfo, sv::OptimizationState)
+
+    interp = sv.inlining.interp
 
     # Only optimize functions defined in the Main module
     if ci.parent.def.module != Main
@@ -102,6 +104,18 @@ function perform_rewrites!(
             ir.stmts.flag[target_i] = CC.IR_FLAG_NULL
             ir.stmts.line[target_i] = 0
         end
+    end
+
+    # If any changes were made to the IR, we have to rerun type inference to infer 
+    # all new method calls. This also makes them susceptible to inlining later on
+    # in the pipeline.
+    if made_changes
+        method_info = CC.MethodInfo(ci)
+        world = Base.get_world_counter()
+        max_world = typemax(UInt64)
+        irstate = CC.IRInterpretationState(interp, method_info, ir, ci.parent, ci.slottypes, world, world, max_world)
+
+        CC.ir_abstract_constant_propagation(interp, irstate)
     end
 
     return ir, made_changes
