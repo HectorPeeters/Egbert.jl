@@ -49,16 +49,16 @@ function build_optimization_pipeline()
 
     CC.register_fixedpointpass!(pm, "fixed point", function (ir, ci, sv)
         # Perform rewrite optimizations
-        ir, rewrote = perform_rewrites!(ir, ci, sv.inlining.interp)
+        ir, rewrote = perform_rewrites!(ir, ci, sv)
         if rewrote
             ir = CC.compact!(ir, true)
         end
 
-        # Cleanup calls to compiler barrier functions
-        ir, cleanedup = replace_compbarrier_calls!(ir, ci, sv)
+        # Clean up calls to wrapper methods
+        ir, cleanedup = cleanup_wrappers!(ir, ci, sv)
 
         # Perform inlining and compact if we were able to clean up
-        if cleanedup
+        if rewrote || cleanedup
             ir, _ = CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds)
             ir = CC.compact!(ir)
         end
@@ -66,11 +66,11 @@ function build_optimization_pipeline()
         return ir, (rewrote || cleanedup)
     end)
 
-    CC.register_pass!(pm, "SROA", (ir, _, sv) ->
+    CC.register_condpass!(pm, "SROA", (ir, _, sv) ->
         CC.sroa_pass!(ir, sv.inlining) |> pass_changed)
-    CC.register_pass!(pm, "ADCE", (ir, _, sv) ->
+    CC.register_condpass!(pm, "ADCE", (ir, _, sv) ->
         CC.adce_pass!(ir, sv.inlining))
-    CC.register_condpass!(pm, "compact 3", (ir, _, _) ->
+    CC.register_condpass!(pm, "compact 4", (ir, _, _) ->
         CC.compact!(ir, true) |> pass_changed)
 
     # Log the result of the optimizations
