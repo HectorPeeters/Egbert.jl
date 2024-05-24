@@ -25,12 +25,8 @@ end
     return perform_mul(a, b)
 end
 
-function perform_add_mul(a::CustomList, b::CustomList, c::CustomList)
-    return CustomList(a.data .+ b.data .* c.data)
-end
-
 @inline function add_mul(a::CustomList, b::CustomList, c::CustomList)
-    return perform_add_mul(a, b, c)
+    return CustomList(a.data .+ b.data .* c.data)
 end
 
 function optimizetarget(a, b, c)
