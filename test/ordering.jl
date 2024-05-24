@@ -6,34 +6,14 @@ using Metatheory
 
 global check_order = []
 
-struct MyInt
-    data::Integer
-
-    @rewritetarget function MyInt(x::Integer)::MyInt
-        return new(x)
-    end
-end
-
-@rewritetarget function newval(x::Integer)::MyInt
+@rewritetarget function newval(x::Int)::Int
     push!(check_order, x)
-    return MyInt(x)
+    return x
 end
 
-function Base.:(==)(a::MyInt, b::MyInt)
-    return a.data == b.data
-end
-
-@rewritetarget function add(a::MyInt, b::MyInt)::MyInt
-    return MyInt(a.data + b.data)
-end
-
-@rewritetarget function add3(a::MyInt, b::MyInt, c::MyInt)::MyInt
-    return MyInt(a.data + b.data + c.data)
-end
-
-@rewritetarget function mul(a::MyInt, b::MyInt)::MyInt
-    return MyInt(a.data * b.data)
-end
+@rewritetarget add(a::Int, b::Int)::Int = a + b
+@rewritetarget add3(a::Int, b::Int, c::Int)::Int = a + b + c
+@rewritetarget mul(a::Int, b::Int)::Int = a * b
 
 function tooptimize(a, b, c)
     return add(newval(a), add(newval(b), newval(c)))
@@ -44,7 +24,7 @@ rules = @theory a b c begin
 end
 
 @testset "ArgumentOrdering" begin
-    @test tooptimize(1, 2, 3) == MyInt(6)
+    @test tooptimize(1, 2, 3) == 6
 
     @test begin
         global check_order = []
