@@ -87,7 +87,7 @@ function perform_rewrites!(
 
         # Patch the optimized instructions back into the IR code
         for (i, instr) in enumerate(optim_instr)
-            target_i = i+block.stmts.start-1
+            target_i = i + block.stmts.start - 1
 
             ir.stmts.stmt[target_i] = instr
             ir.stmts.type[target_i] = optim_types[i]
@@ -97,7 +97,7 @@ function perform_rewrites!(
 
         # Remove any remaining instructions
         for i in length(optim_instr)+1:length(block.stmts)
-            target_i = i+block.stmts.start-1
+            target_i = i + block.stmts.start - 1
             ir.stmts.stmt[target_i] = nothing
             ir.stmts.type[target_i] = Nothing
             ir.stmts.info[target_i] = CC.NoCallInfo()
