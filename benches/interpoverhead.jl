@@ -1,12 +1,15 @@
 using GpuOptim: CodeCache
-using BenchmarkTools: @benchmark
+using BenchmarkTools: @benchmark, mean
 using CSV
 using Tables
-using Statistics
+using Random
 
 const CC = Core.Compiler
 
 const test_ci_cache = CodeCache()
+const code_cache = Dict{Tuple{UInt,DataType},Core.OpaqueClosure}()
+
+struct TestInterpreterToken end
 
 mutable struct TestInterpreter <: CC.AbstractInterpreter
     world::UInt
@@ -49,7 +52,7 @@ CC.OptimizationParams(interp::TestInterpreter) = interp.opt_params
 CC.get_inference_world(interp::TestInterpreter) = interp.world
 CC.get_inference_cache(interp::TestInterpreter) = interp.inf_cache
 CC.code_cache(interp::TestInterpreter) = CC.WorldView(interp.code_cache, interp.world)
-CC.cache_owner(::TestInterpreter) = TestInterpreter
+CC.cache_owner(::TestInterpreter) = TestInterpreterToken
 
 CC.build_opt_pipeline(interp::TestInterpreter) = interp.opt_pipeline
 
@@ -72,28 +75,31 @@ macro custom(ex::Expr)
     quote
         f = $(esc(f))
         @assert sizeof(f) == 0 "OpaqueClosures have different semantics wrt. captures, and cannot be used to implement closures with an environment"
+
         args = ($(map(esc, args)...),)
-
-        ft = typeof(f)
         types = map(typeof, args)
-        obj = custom_compiler(ft, types)
 
-        obj(args...)
+        sig = CC.signature_type(f, types)
+        world = Base.get_world_counter()
+
+        cache_entry = get(code_cache, (world, sig), nothing)
+        if cache_entry !== nothing
+            cache_entry(args...)
+        else
+            obj = custom_compiler(sig, world)
+            code_cache[(world, sig)] = obj
+            obj(args...)
+        end
     end
 end
 
-function custom_compiler(ft, types)
-    tt = Tuple{types...}
-    sig = Tuple{ft,types...}
-    world = Base.get_world_counter()
-
+function custom_compiler(sig, world)
     interp = TestInterpreter(world;
         code_cache=test_ci_cache,
         inf_params=CC.InferenceParams(),
         opt_params=CC.OptimizationParams())
 
     match, _ = CC._findsup(sig, nothing, world)
-    match === nothing && throw(MethodError(ft, tt, world))
     mi = CC.specialize_method(match)
 
     inferred = CC.typeinf_ext_toplevel(interp, mi)
@@ -113,12 +119,12 @@ function matmul(n)
     return A * B
 end
 
-function sortfunc(n)
+function sortfunc(n::Int)
     xs = rand(n)
     return sort(xs)
 end
 
-function gcd(a, b)
+function gcd(a::Int, b::Int)
     while a != b
         if a > b
             a -= b
@@ -129,6 +135,8 @@ function gcd(a, b)
 
     return a
 end
+
+Random.seed!(1234)
 
 name = []
 normal = []
@@ -182,7 +190,7 @@ xs = []
 ys = []
 ys_custom = []
 
-for i in 41:50
+for i in 1:50
     println("Running for n = ", i)
     push!(xs, i)
     push!(ys, mean(@benchmark(fib($i))).time)
