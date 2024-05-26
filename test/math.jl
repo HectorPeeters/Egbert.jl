@@ -5,13 +5,8 @@ using BenchmarkTools: @benchmark
 
 global crash_mul = false
 
-@rewritetarget function add(a::Integer, b::Integer)::Integer
-    return a + b
-end
-
-@rewritetarget function sub(a::Integer, b::Integer)::Integer
-    return a - b
-end
+@rewritetarget add(a::Integer, b::Integer)::Integer = a + b
+@rewritetarget sub(a::Integer, b::Integer)::Integer = a - b
 
 @rewritetarget function mul(a::Integer, b::Integer)::Integer
     if crash_mul
@@ -20,9 +15,7 @@ end
     return a * b
 end
 
-@rewritetarget function pow(a::Integer, b::Integer)::Integer
-    return a^b
-end
+@rewritetarget pow(a::Integer, b::Integer)::Integer = a^b
 
 function tooptimize(a::Integer, b::Integer)
     return add(pow(a, 2), add(mul(2, mul(a, b)), pow(b, 2)))
