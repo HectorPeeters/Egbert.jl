@@ -1,4 +1,4 @@
-using TermInterface
+using Metatheory.TermInterface
 using Metatheory.EGraphs
 using DataStructures: OrderedDict
 
@@ -66,8 +66,8 @@ function EGraphs.join(::Val{:metadata_analysis}, a, b)
         order = b.order
     end
 
-    a.type != b.type && error("Types do not match")
-    return (type=a.type, order=order, has_effects=false)
+    type = typejoin(a.type, b.type)
+    return (type=type, order=order, has_effects=a.has_effects || b.has_effects)
 end
 
 mutable struct IrToExpr
