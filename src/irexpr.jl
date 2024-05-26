@@ -202,15 +202,29 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
         )
     end
 
-    return IRExpr(
-        e.args[1].name,
-        map(enumerate(e.args[2:end])) do (i, x)
-            ir_to_expr!(irtoexpr, x)
-        end,
-        t,
-        irtoexpr.ssa_index,
-        false
-    )
+    if e.head == :call || e.head == :new
+        return IRExpr(
+            e.args[1].name,
+            map(enumerate(e.args[2:end])) do (i, x)
+                ir_to_expr!(irtoexpr, x)
+            end,
+            t,
+            irtoexpr.ssa_index,
+            false
+        )
+    end
+
+    if e.head == :boundscheck
+        return IRExpr(
+            :__boundscheck__,
+            [e, irtoexpr.ssa_index],
+            nothing,
+            irtoexpr.ssa_index,
+            true
+        )
+    end
+
+    error("Unknown expression: ", e)
 end
 
 struct ExprToIr
@@ -318,7 +332,11 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
 
     if expr.head == :__foreigncall__
         source_ssa_id = expr.args[2]
+        return push_instr!(exprtoir, expr.args[1], expr.type; source_ssa_id=source_ssa_id)
+    end
 
+    if expr.head == :__boundscheck__
+        source_ssa_id = expr.args[2]
         return push_instr!(exprtoir, expr.args[1], expr.type; source_ssa_id=source_ssa_id)
     end
 
