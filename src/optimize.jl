@@ -13,8 +13,6 @@ rules.
 function perform_rewrites!(
     ir::IRCode, ci::CC.CodeInfo, sv::OptimizationState)
 
-    interp = sv.inlining.interp
-
     # Only optimize functions defined in the Main module
     if ci.parent.def.module != Main
         return ir, false
@@ -29,6 +27,8 @@ function perform_rewrites!(
     end
 
     made_changes = false
+
+    interp = sv.inlining.interp
 
     for (i, block) in enumerate(cfg.blocks)
         # Convert the IR block to an expression tree
