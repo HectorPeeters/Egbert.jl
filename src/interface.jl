@@ -2,7 +2,7 @@ using .Core: OpaqueClosure, SSAValue
 
 const global_ci_cache = CodeCache()
 
-const closure_cache = Dict{Tuple{UInt, DataType}, OpaqueClosure}()
+const closure_cache = Dict{Tuple{UInt,DataType},OpaqueClosure}()
 
 """
     custom(rules, ex::Expr)
@@ -10,7 +10,6 @@ const closure_cache = Dict{Tuple{UInt, DataType}, OpaqueClosure}()
 Execute a function call using the e-graph optimization pipeline.
 """
 # TODO: this macro should get a better name
-export custom
 macro custom(options, rules, ex::Expr)
     Meta.isexpr(ex, :call) || error("not a function call")
     f, args... = ex.args
@@ -32,8 +31,8 @@ macro custom(options, rules, ex::Expr)
             cache_entry
         else
             rules = $(esc(rules))
-    
-            obj = custom_compiler(sig, world, options, rules)
+
+            obj = custom_compiler(f, types, world, options, rules)
             closure_cache[(world, sig)] = obj
             obj
         end
@@ -47,17 +46,19 @@ macro custom(options, rules, ex::Expr)
 end
 
 """
-    custom_compiler(ft, types, rules)
+    custom_compiler(ft, tt, world, options, rules)
 
 Compile a function using the e-graph optimization pipeline.
 """
-function custom_compiler(sig, world, options::Options, rules::Any)
+function custom_compiler(ft, tt, world, options::Options, rules::Any)
     interp = CustomInterpreter(world;
         code_cache=global_ci_cache,
         inf_params=CC.InferenceParams(),
         opt_params=CC.OptimizationParams(),
         options=options,
         rules=rules)
+
+    sig = CC.signature_type(ft, tt)
 
     if !options.enable_caching
         irs = Base.code_ircode_by_type(sig; interp)
