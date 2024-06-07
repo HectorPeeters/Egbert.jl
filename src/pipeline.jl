@@ -27,27 +27,60 @@ function pass_group(pm::CC.PassManager)
     return (ir::IRCode, ci::CC.CodeInfo, sv::OptimizationState) -> CC.run_passes(pm, ir, ci, sv)
 end
 
+const TIME = OrderedDict{String,Tuple{Float64,Int}}()
+
+function time(name, x)
+    function (ir, ci, sv)
+        result = @timed x(ir, ci, sv)
+
+        if !haskey(TIME, name)
+            TIME[name] = (0.0, 0)
+        end
+
+        e = TIME[name]
+        TIME[name] = (e[1] + result.time, e[2] + 1)
+
+        result.value
+    end
+end
+
+function print_pipeline_timings()
+    for (name, (time, count)) in TIME
+        println(name, ": ", time / count, " (", count, " runs)")
+    end
+end
+
+function clear_pipeline_timings()
+    empty!(TIME)
+end
+
 function build_optimization_pipeline()
     pm = CC.PassManager()
 
-    # Perform initial conversion to IRCode
-    CC.register_pass!(pm, "slot2reg", CC.slot2reg)
-    CC.register_condpass!(pm, "compact 1", (ir, _, _) ->
-        CC.compact!(ir) |> pass_changed)
+    CC.register_pass!(pm, "standard opt pipeline", time("default1", pass_group(
+        let pm = CC.PassManager()
+            # Perform initial conversion to IRCode
+            CC.register_pass!(pm, "slot2reg", CC.slot2reg)
+            CC.register_condpass!(pm, "compact 1", (ir, _, _) ->
+                CC.compact!(ir) |> pass_changed)
 
-    # Perform first pass of normal optimization pipeline
-    CC.register_pass!(pm, "inlining", (ir, ci, sv) ->
-        CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds))
-    CC.register_pass!(pm, "compact 2", (ir, _, _) ->
-        CC.compact!(ir) |> pass_changed)
-    CC.register_pass!(pm, "SROA", (ir, _, sv) ->
-        CC.sroa_pass!(ir, sv.inlining) |> pass_changed)
-    CC.register_pass!(pm, "ADCE", (ir, _, sv) ->
-        CC.adce_pass!(ir, sv.inlining))
-    CC.register_condpass!(pm, "compact 3", (ir, _, _) ->
-        CC.compact!(ir, true) |> pass_changed)
+            # Perform first pass of normal optimization pipeline
+            CC.register_pass!(pm, "inlining", (ir, ci, sv) ->
+                CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds))
+            CC.register_pass!(pm, "compact 2", (ir, _, _) ->
+                CC.compact!(ir) |> pass_changed)
+            CC.register_pass!(pm, "SROA", (ir, _, sv) ->
+                CC.sroa_pass!(ir, sv.inlining) |> pass_changed)
+            CC.register_pass!(pm, "ADCE", (ir, _, sv) ->
+                CC.adce_pass!(ir, sv.inlining))
+            CC.register_condpass!(pm, "compact 3", (ir, _, _) ->
+                CC.compact!(ir, true) |> pass_changed)
 
-    CC.register_fixedpointpass!(pm, "fixed point", function (ir, ci, sv)
+            pm
+        end))
+    )
+
+    CC.register_fixedpointpass!(pm, "fixed point", time("fixedpoint", function (ir, ci, sv)
         # Perform rewrite optimizations
         ir, rewrote = perform_rewrites!(ir, ci, sv)
         if rewrote
@@ -64,14 +97,20 @@ function build_optimization_pipeline()
         end
 
         return ir, (rewrote || cleanedup)
-    end)
+    end))
 
-    CC.register_condpass!(pm, "SROA", (ir, _, sv) ->
-        CC.sroa_pass!(ir, sv.inlining) |> pass_changed)
-    CC.register_condpass!(pm, "ADCE", (ir, _, sv) ->
-        CC.adce_pass!(ir, sv.inlining))
-    CC.register_condpass!(pm, "compact 4", (ir, _, _) ->
-        CC.compact!(ir, true) |> pass_changed)
+    CC.register_pass!(pm, "standard opt pipeline", time("default2", pass_group(
+        let pm = CC.PassManager()
+            CC.register_condpass!(pm, "SROA", (ir, _, sv) ->
+                CC.sroa_pass!(ir, sv.inlining) |> pass_changed)
+            CC.register_condpass!(pm, "ADCE", (ir, _, sv) ->
+                CC.adce_pass!(ir, sv.inlining))
+            CC.register_condpass!(pm, "compact 4", (ir, _, _) ->
+                CC.compact!(ir, true) |> pass_changed)
+
+            pm
+        end))
+    )
 
     # Log the result of the optimizations
     CC.register_pass!(pm, "log", logir)
