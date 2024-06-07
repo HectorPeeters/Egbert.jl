@@ -88,6 +88,7 @@ CC.code_cache(interp::CustomInterpreter) = CC.WorldView(interp.code_cache, inter
 CC.cache_owner(::CustomInterpreter) = CustomInterpreterToken
 
 CC.build_opt_pipeline(interp::CustomInterpreter) = interp.options.opt_pipeline
+CC.enable_logging(::CustomInterpreter) = false
 
 CC.lock_mi_inference(::CustomInterpreter, ::MethodInstance) = nothing
 CC.unlock_mi_inference(::CustomInterpreter, ::MethodInstance) = nothing
