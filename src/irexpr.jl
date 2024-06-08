@@ -13,28 +13,26 @@ struct IRExpr
     head::Any
     args::Vector{Any}
     type::Any
-    order::Union{Nothing,Integer}
-    has_effects::Bool
 end
 
 function Base.:(==)(a::IRExpr, b::IRExpr)
-    a.head == b.head && a.args == b.args && a.order == b.order
+    a.head == b.head && a.args == b.args
 end
 
-TermInterface.istree(e::IRExpr) = true
+TermInterface.istree(::IRExpr) = true
 TermInterface.operation(e::IRExpr) = e.head
 TermInterface.exprhead(::IRExpr) = :call
 TermInterface.arguments(e::IRExpr) = e.args
-TermInterface.metadata(e::IRExpr) = (type=e.type, order=e.order, has_effects=e.has_effects)
+TermInterface.metadata(e::IRExpr) = (type=e.type,)
 
 function TermInterface.similarterm(
-    e::IRExpr, head, args;
+    ::IRExpr, head, args;
     metadata=nothing, exprhead=:call
 )
     if metadata !== nothing
-        IRExpr(head, args, metadata.type, metadata.order, metadata.has_effects)
+        IRExpr(head, args, metadata.type)
     else
-        IRExpr(head, args, nothing, nothing, nothing)
+        IRExpr(head, args, nothing)
     end
 end
 
@@ -44,30 +42,19 @@ function EGraphs.egraph_reconstruct_expression(
     exprhead=nothing
 )
     if metadata !== nothing
-        IRExpr(op, args, metadata.type, metadata.order, metadata.has_effects)
+        IRExpr(op, args, metadata.type)
     else
-        IRExpr(op, args, nothing, nothing, false)
+        IRExpr(op, args, nothing)
     end
 end
 
 function EGraphs.make(::Val{:metadata_analysis}, g, n)
-    return (type=Any, order=nothing, has_effects=false)
+    return (type=Any,)
 end
 
 function EGraphs.join(::Val{:metadata_analysis}, a, b)
-    order = nothing
-    if a.order !== nothing
-        if b.order !== nothing
-            order = min(a.order, b.order)
-        else
-            order = a.order
-        end
-    elseif b.order !== nothing
-        order = b.order
-    end
-
     type = typejoin(a.type, b.type)
-    return (type=type, order=order, has_effects=a.has_effects || b.has_effects)
+    return (type=type,)
 end
 
 mutable struct IrToExpr
@@ -106,22 +93,22 @@ function markinstruction!(irtoexpr::IrToExpr, id::Integer)
 end
 
 function get_root_expr!(irtoexpr::IrToExpr)
-    toplevel_exprs = []
+    sideeffect_exprs = []
 
-    while true
-        index = findlast(x -> !x, irtoexpr.converted)
-        if index === nothing
-            break
+    for i in irtoexpr.range
+        flags = irtoexpr.flags[i]
+
+        if !CC.has_flag(flags, CC.IR_FLAG_EFFECT_FREE)
+            if irtoexpr.instructions[i] === nothing
+                continue
+            end
+
+            expr = ir_to_expr!(irtoexpr, CC.SSAValue(i))
+            push!(sideeffect_exprs, expr)
         end
-
-        markinstruction!(irtoexpr, index)
-
-        instr_index = irtoexpr.range.start + index - 1
-        expr = ir_to_expr!(irtoexpr, CC.SSAValue(instr_index))
-        push!(toplevel_exprs, expr)
     end
 
-    return IRExpr(:theta, reverse(toplevel_exprs), nothing, nothing, false)
+    return IRExpr(:alpha, sideeffect_exprs, nothing)
 end
 
 function ir_to_expr!(irtoexpr::IrToExpr, s::CC.SSAValue)
@@ -142,7 +129,7 @@ end
 ir_to_expr!(_::IrToExpr, x) = x
 
 function ir_to_expr!(irtoexpr::IrToExpr, r::GlobalRef, t)
-    return IRExpr(:ref, [r], GlobalRef, irtoexpr.ssa_index, false)
+    return IRExpr(:ref, [r], GlobalRef)
 end
 
 function ir_to_expr!(irtoexpr::IrToExpr, r::CC.ReturnNode, t)
@@ -150,18 +137,14 @@ function ir_to_expr!(irtoexpr::IrToExpr, r::CC.ReturnNode, t)
         return IRExpr(
             :ret,
             [ir_to_expr!(irtoexpr, r.val)],
-            t,
-            irtoexpr.ssa_index,
-            false
+            t
         )
     end
 
     return IRExpr(
         :ret,
         [],
-        t,
-        irtoexpr.ssa_index,
-        false
+        t
     )
 end
 
@@ -175,9 +158,7 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
             return IRExpr(
                 :__effect__,
                 [e, irtoexpr.ssa_index],
-                nothing,
-                irtoexpr.ssa_index,
-                has_effects
+                nothing
             )
         end
 
@@ -186,9 +167,7 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
             map(enumerate(e.args[3:end])) do (i, x)
                 ir_to_expr!(irtoexpr, x)
             end,
-            t,
-            irtoexpr.ssa_index,
-            has_effects
+            t
         )
     end
 
@@ -196,9 +175,7 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
         return IRExpr(
             :__foreigncall__,
             [e, irtoexpr.ssa_index],
-            nothing,
-            irtoexpr.ssa_index,
-            true,
+            nothing
         )
     end
 
@@ -208,9 +185,7 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
             map(enumerate(e.args[2:end])) do (i, x)
                 ir_to_expr!(irtoexpr, x)
             end,
-            t,
-            irtoexpr.ssa_index,
-            false
+            t
         )
     end
 
@@ -218,9 +193,7 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
         return IRExpr(
             :__boundscheck__,
             [e, irtoexpr.ssa_index],
-            nothing,
-            irtoexpr.ssa_index,
-            true
+            nothing
         )
     end
 
@@ -264,58 +237,12 @@ function cse_expr_to_ir!(exprtoir::ExprToIr, sym::Symbol, expr::IRExpr)
     exprtoir.cse_env[sym] = ssa_val
 end
 
-
-"""
-    convert_sorted_args!(exprtoir::ExprToIr, args::Vector{Any})
-
-Emits the instructions for the arguments of an expression in the order
-determined by the order field of each argument. This ensures that the arguments
-are emitted in the correct order, even when an e-graph optimization has
-reordered the arguments.
-"""
-function convert_sorted_args!(exprtoir::ExprToIr, args::Vector{Any})
-    result::Vector{Any} = fill(missing, length(args))
-    low = typemin(Int32)
-
-    for _ in 1:length(args)
-        # Start at the first index we haven't converted yet
-        next_index = findfirst(x -> x === missing, result)
-
-        for (j, arg) in enumerate(args)
-            # Skip arguments we've already converted
-            result[j] !== missing && continue
-
-            # If the argument doesn't have an order, emit next
-            if !isa(arg, IRExpr) || arg.order === nothing
-                next_index = j
-                break
-            end
-
-            # Skip arguments with an order lower than the current low
-            arg.order < low && continue
-
-            # If the argument has a lower order than the current next_index
-            # update it
-            if arg.order < args[next_index].order
-                next_index = j
-            end
-        end
-
-        # Update our low order if the current argument has an order
-        if args[next_index] isa Expr
-            low = args[next_index].order
-        end
-
-        # Emit the argument
-        result[next_index] = expr_to_ir!(exprtoir, args[next_index])
-    end
-
-    return result
-end
-
 function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
-    if expr.head == :theta
-        convert_sorted_args!(exprtoir, expr.args)
+    if expr.head == :alpha
+        for arg in expr.args
+            expr_to_ir!(exprtoir, arg)
+        end
+        # convert_sorted_args!(exprtoir, expr.args)
         return (exprtoir.instructions, exprtoir.types)
     end
 
@@ -354,7 +281,8 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
     end
 
     func_name = expr.head
-    args = convert_sorted_args!(exprtoir, expr.args)
+    # args = convert_sorted_args!(exprtoir, expr.args)
+    args = map(a -> expr_to_ir!(exprtoir, a), expr.args)
     method = GlobalRef(exprtoir.mod, Symbol(func_name))
 
     instruction = Expr(:call, method, args...)
