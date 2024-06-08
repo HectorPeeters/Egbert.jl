@@ -13,6 +13,7 @@ struct IRExpr
     head::Any
     args::Vector{Any}
     type::Any
+    mod::Union{Symbol,Nothing}
 end
 
 function Base.:(==)(a::IRExpr, b::IRExpr)
@@ -23,16 +24,16 @@ TermInterface.istree(::IRExpr) = true
 TermInterface.operation(e::IRExpr) = e.head
 TermInterface.exprhead(::IRExpr) = :call
 TermInterface.arguments(e::IRExpr) = e.args
-TermInterface.metadata(e::IRExpr) = (type=e.type,)
+TermInterface.metadata(e::IRExpr) = (type=e.type, mod=e.mod)
 
 function TermInterface.similarterm(
     ::IRExpr, head, args;
     metadata=nothing, exprhead=:call
 )
     if metadata !== nothing
-        IRExpr(head, args, metadata.type)
+        IRExpr(head, args, metadata.type, metadata.mod)
     else
-        IRExpr(head, args, nothing)
+        IRExpr(head, args, nothing, nothing)
     end
 end
 
@@ -42,19 +43,30 @@ function EGraphs.egraph_reconstruct_expression(
     exprhead=nothing
 )
     if metadata !== nothing
-        IRExpr(op, args, metadata.type)
+        IRExpr(op, args, metadata.type, metadata.mod)
     else
-        IRExpr(op, args, nothing)
+        IRExpr(op, args, nothing, nothing)
     end
 end
 
 function EGraphs.make(::Val{:metadata_analysis}, g, n)
-    return (type=Any,)
+    return (type=Any, mod=nothing)
 end
 
 function EGraphs.join(::Val{:metadata_analysis}, a, b)
+    mod = nothing
+    if a.mod !== nothing
+        if a.mod !== nothing
+            a.mod != b.mod && error("Different modules")
+        else
+            mod = b.mod
+        end
+    elseif a.mod !== nothing
+        mod = a.mod
+    end
+
     type = typejoin(a.type, b.type)
-    return (type=type,)
+    return (type=type, mod=mod)
 end
 
 mutable struct IrToExpr
@@ -63,11 +75,6 @@ mutable struct IrToExpr
     flags::Vector{Any}
     range::CC.StmtRange
     converted::Vector{Bool}
-    # NOTE: This value is used to order arguments in a function call in cases
-    #       like this: add(a, add(b, c)) --> add3(b, c, a)
-    #       The order in which the IR for the arguments is generated is
-    #       important. It should still be `a, b, c` even though the order
-    #       of the arguments is now `b, c, a`.
     ssa_index::Integer
 
     IrToExpr(instrs::CC.InstructionStream, range::CC.StmtRange) = new(
@@ -108,7 +115,7 @@ function get_root_expr!(irtoexpr::IrToExpr)
         end
     end
 
-    return IRExpr(:alpha, sideeffect_exprs, nothing)
+    return IRExpr(:alpha, sideeffect_exprs, nothing, nothing)
 end
 
 function ir_to_expr!(irtoexpr::IrToExpr, s::CC.SSAValue)
@@ -128,8 +135,8 @@ end
 
 ir_to_expr!(_::IrToExpr, x) = x
 
-function ir_to_expr!(irtoexpr::IrToExpr, r::GlobalRef, t)
-    return IRExpr(:ref, [r], GlobalRef)
+function ir_to_expr!(::IrToExpr, r::GlobalRef, t)
+    return IRExpr(:ref, [r], GlobalRef, Symbol(r.mod))
 end
 
 function ir_to_expr!(irtoexpr::IrToExpr, r::CC.ReturnNode, t)
@@ -137,14 +144,16 @@ function ir_to_expr!(irtoexpr::IrToExpr, r::CC.ReturnNode, t)
         return IRExpr(
             :ret,
             [ir_to_expr!(irtoexpr, r.val)],
-            t
+            t,
+            nothing
         )
     end
 
     return IRExpr(
         :ret,
         [],
-        t
+        t,
+        nothing
     )
 end
 
@@ -158,7 +167,8 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
             return IRExpr(
                 :__effect__,
                 [e, irtoexpr.ssa_index],
-                nothing
+                nothing,
+                Symbol(e.args[1].def.module)
             )
         end
 
@@ -167,7 +177,8 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
             map(enumerate(e.args[3:end])) do (i, x)
                 ir_to_expr!(irtoexpr, x)
             end,
-            t
+            t,
+            Symbol(e.args[1].def.module)
         )
     end
 
@@ -175,6 +186,7 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
         return IRExpr(
             :__foreigncall__,
             [e, irtoexpr.ssa_index],
+            nothing,
             nothing
         )
     end
@@ -185,7 +197,8 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
             map(enumerate(e.args[2:end])) do (i, x)
                 ir_to_expr!(irtoexpr, x)
             end,
-            t
+            t,
+            Symbol(e.args[1].mod)
         )
     end
 
@@ -193,6 +206,7 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
         return IRExpr(
             :__boundscheck__,
             [e, irtoexpr.ssa_index],
+            nothing,
             nothing
         )
     end
@@ -242,7 +256,6 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
         for arg in expr.args
             expr_to_ir!(exprtoir, arg)
         end
-        # convert_sorted_args!(exprtoir, expr.args)
         return (exprtoir.instructions, exprtoir.types)
     end
 
@@ -280,10 +293,13 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
         return push_instr!(exprtoir, expr.args[1], expr.type)
     end
 
-    func_name = expr.head
-    # args = convert_sorted_args!(exprtoir, expr.args)
     args = map(a -> expr_to_ir!(exprtoir, a), expr.args)
-    method = GlobalRef(exprtoir.mod, Symbol(func_name))
+
+    method = if expr.mod !== nothing
+        GlobalRef(eval(expr.mod), Symbol(expr.head))
+    else
+        GlobalRef(exprtoir.mod, Symbol(expr.head))
+    end
 
     instruction = Expr(:call, method, args...)
 
