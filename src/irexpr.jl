@@ -191,7 +191,29 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
         )
     end
 
-    if e.head == :call || e.head == :new
+    if e.head == :call
+        if e.args[1] isa GlobalRef
+            return IRExpr(
+                e.args[1].name,
+                map(enumerate(e.args[2:end])) do (i, x)
+                    ir_to_expr!(irtoexpr, x)
+                end,
+                t,
+                Symbol(e.args[1].mod)
+            )
+        else
+            return IRExpr(
+                e.args[1],
+                map(enumerate(e.args[2:end])) do (i, x)
+                    ir_to_expr!(irtoexpr, x)
+                end,
+                t,
+                nothing
+            )
+        end
+    end
+
+    if e.head == :new
         return IRExpr(
             e.args[1].name,
             map(enumerate(e.args[2:end])) do (i, x)
@@ -293,13 +315,27 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
         return push_instr!(exprtoir, expr.args[1], expr.type)
     end
 
-    args = map(a -> expr_to_ir!(exprtoir, a), expr.args)
+    if expr.head isa Symbol
+        args = map(a -> expr_to_ir!(exprtoir, a), expr.args)
 
-    method = if expr.mod !== nothing
-        GlobalRef(eval(expr.mod), Symbol(expr.head))
-    else
-        GlobalRef(exprtoir.mod, Symbol(expr.head))
+        method = if expr.mod !== nothing
+            GlobalRef(eval(expr.mod), Symbol(expr.head))
+        else
+            GlobalRef(exprtoir.mod, Symbol(expr.head))
+        end
+
+        instruction = Expr(:call, method, args...)
+
+        index = findlast(x -> x == instruction, exprtoir.instructions)
+        if index !== nothing
+            return SSAValue(exprtoir.ssa_start + index - 1)
+        end
+
+        return push_instr!(exprtoir, instruction, expr.type)
     end
+
+    method = expr.head
+    args = map(a -> expr_to_ir!(exprtoir, a), expr.args)
 
     instruction = Expr(:call, method, args...)
 
