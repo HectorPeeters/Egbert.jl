@@ -1,3 +1,4 @@
+include("exprtree.jl")
 include("constantfold.jl")
 include("cse.jl")
 include("math.jl")
