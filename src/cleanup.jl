@@ -10,8 +10,10 @@ function cleanup_wrappers!(ir::IRCode, _::CC.CodeInfo, sv::CC.OptimizationState)
     # Track if we made any changes to prevent unnecessary compact pass
     made_changes = false
 
+    # Get a list of all candidate methods (e.g. methods already compiled)
     candidate_methods = keys(sv.inlining.interp.code_cache.dict)
 
+    # Temporary cache used to store whether wrapper methods can be cleaned up
     cache = IdDict{}()
 
     # Iterate over every instruction
