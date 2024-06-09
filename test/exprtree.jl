@@ -28,8 +28,8 @@ end
 
 doeffect() = println("Side effect!")
 
-add(a::Int, b::Int) = a + b
-assert_conversion(add)
+integer_add(a::Int, b::Int) = a + b
+assert_conversion(integer_add)
 
 broadcast(a) = max.(a)
 assert_conversion(broadcast)
@@ -54,3 +54,9 @@ assert_conversion(callexpr)
 
 base_func(a) = Base.code_ircode(a)
 assert_conversion(base_func)
+
+apply(a) = a()
+assert_conversion(apply)
+
+closure(a) = () -> a
+assert_conversion(closure)
