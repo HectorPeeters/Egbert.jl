@@ -27,33 +27,6 @@ function pass_group(pm::CC.PassManager)
     return (ir::IRCode, ci::CC.CodeInfo, sv::OptimizationState) -> CC.run_passes(pm, ir, ci, sv)
 end
 
-const TIME = OrderedDict{String,Tuple{Float64,Int}}()
-
-function time(name, x)
-    function (ir, ci, sv)
-        result = @timed x(ir, ci, sv)
-
-        if !haskey(TIME, name)
-            TIME[name] = (0.0, 0)
-        end
-
-        e = TIME[name]
-        TIME[name] = (e[1] + result.time, e[2] + 1)
-
-        result.value
-    end
-end
-
-function print_pipeline_timings()
-    for (name, (time, count)) in TIME
-        println(name, ": ", time / count, " (", count, " runs)")
-    end
-end
-
-function clear_pipeline_timings()
-    empty!(TIME)
-end
-
 function register_first_standard_pipeline!(pm::CC.PassManager)
     # Perform initial conversion to IRCode
     CC.register_pass!(pm, "slot2reg", CC.slot2reg)
@@ -123,10 +96,37 @@ function build_optimization_pipeline()
     pm
 end
 
+const TIME = OrderedDict{String,Tuple{Float64,Int}}()
+
+function time(name, x)
+    function (ir, ci, sv)
+        result = @timed x(ir, ci, sv)
+
+        if !haskey(TIME, name)
+            TIME[name] = (0.0, 0)
+        end
+
+        e = TIME[name]
+        TIME[name] = (e[1] + result.time, e[2] + 1)
+
+        result.value
+    end
+end
+
+function print_pipeline_timings()
+    for (name, (time, count)) in TIME
+        println(name, ": ", time / count, " (", count, " runs)")
+    end
+end
+
+function clear_pipeline_timings()
+    empty!(TIME)
+end
+
 function build_timing_optimization_pipeline()
     pm = CC.PassManager()
 
-    CC.register_pass!(pm, "standard opt pipeline", 
+    CC.register_pass!(pm, "standard opt pipeline",
         time("default1", pass_group(
             let pm = CC.PassManager()
                 register_first_standard_pipeline!(pm)
@@ -135,10 +135,10 @@ function build_timing_optimization_pipeline()
         ))
     )
 
-    CC.register_fixedpointpass!(pm, "fixed point", 
+    CC.register_fixedpointpass!(pm, "fixed point",
         time("fixedpoint", rewrite_fixedpoint_pass))
 
-    CC.register_pass!(pm, "standard opt pipeline", 
+    CC.register_pass!(pm, "standard opt pipeline",
         time("default2", pass_group(
             let pm = CC.PassManager()
                 register_second_standard_pipeline!(pm)
