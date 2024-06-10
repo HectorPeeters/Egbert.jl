@@ -36,6 +36,11 @@ function tooptimize4(x)
     return add(mul(y, 0), 2)
 end
 
+function tooptimize5(x)
+    y = do_sideeffect(x)
+    z = do_sideeffect(x)
+    return do_sideeffect(add(y, z))
+end
 
 rules = @theory a b begin
     add(a, b) --> add(b, a)
@@ -97,5 +102,19 @@ end
         global check_order = []
         @custom Options() rules tooptimize4(1)
         check_order == [1]
+    end
+
+    @test tooptimize5(1) == 2
+
+    @test begin
+        global check_order = []
+        tooptimize5(1)
+        check_order == [1, 1, 2]
+    end
+
+    @test begin
+        global check_order = []
+        @custom Options() rules tooptimize5(1)
+        check_order == [1, 1, 2]
     end
 end

@@ -122,6 +122,7 @@ function get_root_expr!(irtoexpr::IrToExpr)
 end
 
 function ir_to_expr!(irtoexpr::IrToExpr, s::CC.SSAValue)
+    old_ssa_index = irtoexpr.ssa_index
     irtoexpr.ssa_index = s.id
 
     if s.id < irtoexpr.range.start || s.id > irtoexpr.range.stop
@@ -129,19 +130,18 @@ function ir_to_expr!(irtoexpr::IrToExpr, s::CC.SSAValue)
     end
 
     markinstruction!(irtoexpr, s.id)
-    return ir_to_expr!(
+    result = ir_to_expr!(
         irtoexpr,
         irtoexpr.instructions[s.id],
         irtoexpr.types[s.id]
     )
+
+    irtoexpr.ssa_index = old_ssa_index
+    return result
 end
 
-ir_to_expr!(_::IrToExpr, x) = x
-
-function ir_to_expr!(::IrToExpr, r::GlobalRef, t)
-    # return IRExpr(:ref, [r], GlobalRef, Symbol(r.mod))
-    r
-end
+ir_to_expr!(::IrToExpr, r::GlobalRef, _) = r
+ir_to_expr!(::IrToExpr, x) = x
 
 function ir_to_expr!(irtoexpr::IrToExpr, r::CC.ReturnNode, t)
     if isdefined(r, :val)
@@ -163,23 +163,14 @@ function ir_to_expr!(irtoexpr::IrToExpr, r::CC.ReturnNode, t)
     )
 end
 
+function has_effects(irtoexpr::IrToExpr, i)
+    flags = irtoexpr.flags[i]
+    !CC.has_flag(flags, CC.IR_FLAG_EFFECT_FREE)
+end
+
 function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
     if e.head == :invoke
-        flags = irtoexpr.flags[irtoexpr.ssa_index]
-        has_effects = !CC.has_flag(flags, CC.IR_FLAG_EFFECT_FREE)
-
-        if has_effects
-            @debug "Function has effects: ", e.args[1].def.name
-            return IRExpr(
-                :effect,
-                :effect,
-                [e, irtoexpr.ssa_index],
-                nothing,
-                Symbol(e.args[1].def.module)
-            )
-        end
-
-        return IRExpr(
+        result = IRExpr(
             :call,
             Symbol(e.args[1].def.name),
             map(enumerate(e.args[3:end])) do (i, x)
@@ -188,22 +179,24 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
             t,
             Symbol(e.args[1].def.module)
         )
-    end
 
-    if e.head == :foreigncall
-        return IRExpr(
-            :foreigncall,
-            :foreigncall,
-            [e, irtoexpr.ssa_index],
-            nothing,
-            nothing
-        )
+        if has_effects(irtoexpr, irtoexpr.ssa_index)
+            result = IRExpr(
+                :effect,
+                :effect,
+                [result, irtoexpr.ssa_index],
+                nothing,
+                nothing
+            )
+        end
+
+        return result
     end
 
     if e.head == :call
         method = ir_to_expr!(irtoexpr, e.args[1])
-        if method isa GlobalRef
-            return IRExpr(
+        result = if method isa GlobalRef
+            IRExpr(
                 :call,
                 method.name,
                 map(enumerate(e.args[2:end])) do (i, x)
@@ -213,7 +206,7 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
                 Symbol(method.mod)
             )
         else
-            return IRExpr(
+            IRExpr(
                 :call,
                 e.args[1],
                 map(enumerate(e.args[2:end])) do (i, x)
@@ -223,6 +216,18 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
                 nothing
             )
         end
+
+        if has_effects(irtoexpr, irtoexpr.ssa_index)
+            result = IRExpr(
+                :effect,
+                :effect,
+                [result, irtoexpr.ssa_index],
+                nothing,
+                nothing
+            )
+        end
+
+        return result
     end
 
     if e.head == :new
@@ -233,6 +238,17 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
                 ir_to_expr!(irtoexpr, x)
             end,
             t,
+            nothing
+        )
+    end
+
+    if e.head == :foreigncall
+        # TODO: evaluate expression inside
+        return IRExpr(
+            :foreigncall,
+            :foreigncall,
+            [e, irtoexpr.ssa_index],
+            nothing,
             nothing
         )
     end
@@ -262,18 +278,21 @@ struct ExprToIr
         [], [], [], range.start, mod, OrderedDict())
 end
 
-function push_instr!(exprtoir::ExprToIr, instr, type; source_ssa_id=nothing)
+function push_instr!(exprtoir::ExprToIr, instr, type, source_ssa_id=nothing)
     push!(exprtoir.instructions, instr)
+
     if type === nothing
         push!(exprtoir.types, Any)
     else
         push!(exprtoir.types, type)
     end
+
     push!(exprtoir.source_ssa_ids, source_ssa_id)
+
     return SSAValue(length(exprtoir.instructions) + exprtoir.ssa_start - 1)
 end
 
-expr_to_ir!(_::ExprToIr, x) = x
+expr_to_ir!(::ExprToIr, x) = x
 
 function expr_to_ir!(exprtoir::ExprToIr, s::Symbol)
     if !haskey(exprtoir.cse_env, s)
@@ -287,7 +306,7 @@ function cse_expr_to_ir!(exprtoir::ExprToIr, sym::Symbol, expr::IRExpr)
     exprtoir.cse_env[sym] = ssa_val
 end
 
-function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
+function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr; source_ssa_id=nothing, no_cse=false)
     if expr.head == :alpha
         for arg in expr.args
             expr_to_ir!(exprtoir, arg)
@@ -303,30 +322,30 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
             return SSAValue(exprtoir.ssa_start + index - 1)
         end
 
-        return push_instr!(exprtoir, expr.args[1], expr.type; source_ssa_id=source_ssa_id)
+        return expr_to_ir!(exprtoir, expr.args[1], source_ssa_id=source_ssa_id, no_cse=true)
     end
 
     if expr.head == :foreigncall
-        source_ssa_id = expr.args[2]
-        return push_instr!(exprtoir, expr.args[1], expr.type; source_ssa_id=source_ssa_id)
+        ssa_id = expr.args[2]
+        return push_instr!(exprtoir, expr.args[1], expr.type; source_ssa_id=ssa_id)
     end
 
     if expr.head == :boundscheck
-        source_ssa_id = expr.args[2]
-        return push_instr!(exprtoir, expr.args[1], expr.type; source_ssa_id=source_ssa_id)
+        ssa_id = expr.args[2]
+        return push_instr!(exprtoir, expr.args[1], expr.type; source_ssa_id=ssa_id)
     end
 
     if expr.head == :ret
         if length(expr.args) == 0
-            return push_instr!(exprtoir, CC.ReturnNode(), expr.type)
+            return push_instr!(exprtoir, CC.ReturnNode(), expr.type, source_ssa_id)
         end
 
         val = expr_to_ir!(exprtoir, expr.args[1])
-        return push_instr!(exprtoir, CC.ReturnNode(val), expr.type)
+        return push_instr!(exprtoir, CC.ReturnNode(val), expr.type, source_ssa_id)
     end
 
     if expr.head == :ref
-        return push_instr!(exprtoir, expr.args[1], expr.type)
+        return push_instr!(exprtoir, expr.args[1], expr.type, source_ssa_id)
     end
 
     if expr.head == :call
@@ -343,11 +362,11 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
         instruction = Expr(expr.head, method, args...)
 
         index = findlast(x -> x == instruction, exprtoir.instructions)
-        if index !== nothing
+        if index !== nothing && !no_cse
             return SSAValue(exprtoir.ssa_start + index - 1)
         end
 
-        return push_instr!(exprtoir, instruction, expr.type)
+        return push_instr!(exprtoir, instruction, expr.type, source_ssa_id)
     end
 
     if expr.head == :new
@@ -356,11 +375,11 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr)
         instruction = Expr(expr.head, args[1], args[2:end]...)
 
         index = findlast(x -> x == instruction, exprtoir.instructions)
-        if index !== nothing
+        if index !== nothing && !no_cse
             return SSAValue(exprtoir.ssa_start + index - 1)
         end
 
-        return push_instr!(exprtoir, instruction, expr.type)
+        return push_instr!(exprtoir, instruction, expr.type, source_ssa_id)
     end
 
     error("TODO: ", expr.head)
