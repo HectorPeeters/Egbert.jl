@@ -31,11 +31,9 @@ end
 # Perform a round-trip from ircode -> irexpr -> e-graph -> irexpr -> ircode
 function assert_conversion(expr)
     ir, _ = Base.code_ircode(expr) |> first
-    println(Symbol(expr))
-    println(ir)
 
     if length(ir.cfg.blocks) != 1
-        @warn "Test not supported: multiple basic blocks"
+        @warn "Test `" * String(Symbol(expr)) * "` not supported: multiple basic blocks"
         return
     end
 
@@ -50,52 +48,59 @@ function assert_conversion(expr)
     exprtoir = ExprToIr(Main, block.stmts)
     (result_instr, _) = expr_to_ir!(exprtoir, result)
 
-    @test instr_equal(ir.stmts.stmt, result_instr)
+    result = instr_equal(ir.stmts.stmt, result_instr)
+    if !result
+        println(Symbol(expr))
+        println(ir)
+    end
+    @test result
 end
 
-doeffect() = println("Side effect!")
-function doeffect2(x)
-    println("Side effect!")
-    return x
+@testset "ExprTree" begin
+    doeffect() = println("Side effect!")
+    function doeffect2(x)
+        println("Side effect!")
+        return x
+    end
+    combine(a, b) = (a, b)
+    
+    integer_add(a::Int, b::Int) = a + b
+    assert_conversion(integer_add)
+    
+    broadcast(a) = max.(a)
+    assert_conversion(broadcast)
+    
+    nested(a) = a.b().c.d()
+    assert_conversion(nested)
+    
+    sideeffect() = doeffect()
+    assert_conversion(sideeffect)
+    
+    function multiple_sideeffect()
+        doeffect()
+        doeffect()
+    end
+    assert_conversion(multiple_sideeffect)
+    
+    function sideeffect2(a, b) 
+        x = doeffect2(a)
+        y = doeffect2(b)
+        return combine(x, y)
+    end
+    assert_conversion(sideeffect2)
+    
+    unreachable() = unreachable()
+    assert_conversion(unreachable)
+    
+    callexpr(a, b) = a + b
+    assert_conversion(callexpr)
+    
+    base_func(a) = Base.code_ircode(a)
+    assert_conversion(base_func)
+    
+    apply(a) = a()
+    assert_conversion(apply)
+    
+    closure(a) = () -> a
+    assert_conversion(closure)
 end
-combine(a, b) = (a, b)
-
-integer_add(a::Int, b::Int) = a + b
-assert_conversion(integer_add)
-
-broadcast(a) = max.(a)
-assert_conversion(broadcast)
-
-nested(a) = a.b().c.d()
-assert_conversion(nested)
-
-sideeffect() = doeffect()
-assert_conversion(sideeffect)
-
-function multiple_sideeffect()
-    doeffect()
-    doeffect()
-end
-assert_conversion(multiple_sideeffect)
-
-function sideeffect2(a, b) 
-    x = doeffect2(a)
-    y = doeffect2(b)
-    return combine(x, y)
-end
-assert_conversion(sideeffect2)
-
-unreachable() = unreachable()
-assert_conversion(unreachable)
-
-callexpr(a, b) = a + b
-assert_conversion(callexpr)
-
-base_func(a) = Base.code_ircode(a)
-assert_conversion(base_func)
-
-apply(a) = a()
-assert_conversion(apply)
-
-closure(a) = () -> a
-assert_conversion(closure)
