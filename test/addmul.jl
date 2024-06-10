@@ -38,7 +38,7 @@ function nooptimizetarget(a, b)
     return add(a, b)
 end
 
-@testset "GpuOptim.jl" begin
+@testset "AddMul" begin
     A = CustomList([1, 2, 3])
     B = CustomList([4, 5, 6])
     C = CustomList([7, 8, 9])
