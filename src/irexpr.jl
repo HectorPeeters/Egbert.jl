@@ -306,7 +306,7 @@ function cse_expr_to_ir!(exprtoir::ExprToIr, sym::Symbol, expr::IRExpr)
     exprtoir.cse_env[sym] = ssa_val
 end
 
-function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr; source_ssa_id=nothing, no_cse=false)
+function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr; no_cse=false)
     if expr.head == :alpha
         for arg in expr.args
             expr_to_ir!(exprtoir, arg)
@@ -322,7 +322,9 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr; source_ssa_id=nothing, no
             return SSAValue(exprtoir.ssa_start + index - 1)
         end
 
-        return expr_to_ir!(exprtoir, expr.args[1], source_ssa_id=source_ssa_id, no_cse=true)
+        result = expr_to_ir!(exprtoir, expr.args[1], no_cse=true)
+        exprtoir.source_ssa_ids[end] = source_ssa_id
+        return result
     end
 
     if expr.head == :foreigncall
@@ -337,15 +339,15 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr; source_ssa_id=nothing, no
 
     if expr.head == :ret
         if length(expr.args) == 0
-            return push_instr!(exprtoir, CC.ReturnNode(), expr.type, source_ssa_id)
+            return push_instr!(exprtoir, CC.ReturnNode(), expr.type)
         end
 
         val = expr_to_ir!(exprtoir, expr.args[1])
-        return push_instr!(exprtoir, CC.ReturnNode(val), expr.type, source_ssa_id)
+        return push_instr!(exprtoir, CC.ReturnNode(val), expr.type)
     end
 
     if expr.head == :ref
-        return push_instr!(exprtoir, expr.args[1], expr.type, source_ssa_id)
+        return push_instr!(exprtoir, expr.args[1], expr.type)
     end
 
     if expr.head == :call
@@ -366,7 +368,7 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr; source_ssa_id=nothing, no
             return SSAValue(exprtoir.ssa_start + index - 1)
         end
 
-        return push_instr!(exprtoir, instruction, expr.type, source_ssa_id)
+        return push_instr!(exprtoir, instruction, expr.type)
     end
 
     if expr.head == :new
@@ -379,7 +381,7 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr; source_ssa_id=nothing, no
             return SSAValue(exprtoir.ssa_start + index - 1)
         end
 
-        return push_instr!(exprtoir, instruction, expr.type, source_ssa_id)
+        return push_instr!(exprtoir, instruction, expr.type)
     end
 
     error("TODO: ", expr.head)
