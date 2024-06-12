@@ -2,6 +2,7 @@ using Metatheory.TermInterface
 const TI = TermInterface
 
 struct Unknown end
+struct Undef end
 
 """
     IRExpr
@@ -28,7 +29,10 @@ TI.head(e::IRExpr) = e.head
 TI.children(e::IRExpr) = e.args
 
 TI.operation(e::IRExpr) = iscall(e) ? first(children(e)) : error("Operation called on non-call node")
-TI.arguments(e::IRExpr) = iscall(e) ? @view(e.args[2:end]) : error("Arguments called on non-call node")
+function TI.arguments(e::IRExpr)
+    # println("ARGS ", TI.head(e.args[1]))
+    iscall(e) ? @view(e.args[2:end]) : error("Arguments called on non-call node")
+end
 
 TI.metadata(e::IRExpr) = (type=e.type, mod=e.mod)
 
@@ -40,19 +44,32 @@ function TI.maketerm(
     end
 
     if head == :__return__
+        if isempty(args)
+            return ReturnExpr(Undef())
+        end
         return ReturnExpr(only(args))
     end
 
     if head == :__effect__
         @assert length(args) == 2
-        return EffectExpr(first(args), args[2])
+        return EffectExpr(args...)
     end
 
     if head == :__new__
-        return NewNode(args)
+        return NewExpr(args)
     end
 
-    println(parentmodule(eval(head)), "\t", args)
+    if head == :.
+        @assert length(args) == 2
+        return PathExpr(args...)
+    end
+
+    # if !(call_expr isa PathExpr || call_expr isa EffectExpr || call_expr isa Core.Argument)
+    #     error("TODO")
+    #     @assert false
+    #     mod = Symbol(parentmodule(eval(head)))
+    #     call_expr = PathExpr(mod, QuoteNode(head))
+    # end
 
     if metadata !== nothing
         IRExpr(:call, [head, args...], metadata.type, metadata.mod)
@@ -80,7 +97,7 @@ end
 
 
 struct ReturnExpr
-    value::Union{Any, Nothing}
+    value::Union{Any,Nothing,Undef}
 end
 
 TI.isexpr(e::ReturnExpr) = true
@@ -97,7 +114,7 @@ end
 
 
 struct EffectExpr
-    value::IRExpr
+    value::Any
     index::Int
 end
 
@@ -119,10 +136,30 @@ struct NewExpr
 end
 
 TI.isexpr(e::NewExpr) = true
-TI.iscall(e::NewExpr) = true
+TI.iscall(e::NewExpr) = false
 
-TI.head(e::NewExpr) = e.head
+TI.head(::NewExpr) = :__new__
 TI.children(e::NewExpr) = e.args
 
-TI.operation(e::NewExpr) = iscall(e) ? first(children(e)) : error("Operation called on non-call node")
-TI.arguments(e::NewExpr) = iscall(e) ? @view(e.args[2:end]) : error("Arguments called on non-call node")
+function TI.maketerm(
+    ::Type{NewExpr}, ::Symbol, args, metadata
+)
+    NewExpr(args)
+end
+
+struct PathExpr
+    path::Any
+    object::QuoteNode
+end
+
+function TI.isexpr(::PathExpr)
+    println("ISEXPR")
+    true
+end
+TI.iscall(::PathExpr) = false
+
+function TI.head(e::PathExpr)
+    println("PATH ", e)
+    :.
+end
+TI.children(e::PathExpr) = [e.path, e.object]

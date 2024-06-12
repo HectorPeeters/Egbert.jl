@@ -99,7 +99,7 @@ function ir_to_expr!(irtoexpr::IrToExpr, r::CC.ReturnNode, t)
         return ReturnExpr(ir_to_expr!(irtoexpr, r.val))
     end
 
-    return IRExpr(nothing)
+    return ReturnExpr(Undef())
 end
 
 function has_effects(irtoexpr::IrToExpr, i)
@@ -109,9 +109,10 @@ end
 
 function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
     if e.head == :invoke
+        path = PathExpr(Symbol(e.args[1].def.module), QuoteNode(Symbol(e.args[1].def.name)))
         args = [
-            Symbol(e.args[1].def.name),
-            map(enumerate(e.args[3:end])) do (i, x)
+            path,
+            map(e.args[3:end]) do x
                 ir_to_expr!(irtoexpr, x)
             end...
         ]
@@ -164,7 +165,7 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
             IRExpr(
                 :call,
                 [
-                    method.name,
+                    PathExpr(Symbol(method.mod), QuoteNode(method.name))
                     map(enumerate(e.args[2:end])) do (i, x)
                         ir_to_expr!(irtoexpr, x)
                     end...
@@ -176,7 +177,7 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
             IRExpr(
                 :call,
                 [
-                    e.args[1],
+                    method,
                     map(enumerate(e.args[2:end])) do (i, x)
                         ir_to_expr!(irtoexpr, x)
                     end...
@@ -231,13 +232,13 @@ function expr_to_ir!(exprtoir::ExprToIr, alpha::AlphaExpr; no_cse=false)
 end
 
 function expr_to_ir!(exprtoir::ExprToIr, ret::ReturnExpr; no_cse=false)
-        # TODO: add return type
-        if ret.value === nothing
-            return push_instr!(exprtoir, CC.ReturnNode(), Any)
-        end
+    # TODO: add return type
+    if ret.value === Undef
+        return push_instr!(exprtoir, CC.ReturnNode(), Any)
+    end
 
-        val = expr_to_ir!(exprtoir, ret.value)
-        return push_instr!(exprtoir, CC.ReturnNode(val), Any)
+    val = expr_to_ir!(exprtoir, ret.value)
+    return push_instr!(exprtoir, CC.ReturnNode(val), Any)
 end
 
 function expr_to_ir!(exprtoir::ExprToIr, effect::EffectExpr; no_cse=false)
@@ -261,42 +262,57 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::NewExpr; no_cse=false)
         return SSAValue(exprtoir.ssa_start + index - 1)
     end
 
-    return push_instr!(exprtoir, instruction, expr.type)
+    # TODO: type information
+    return push_instr!(exprtoir, instruction, Any)
+end
+
+function expr_to_ir!(exprtoir::ExprToIr, expr::PathExpr; no_cse=false)
+    mod = eval(expr.path)
+    object = expr_to_ir!(exprtoir, expr.object)
+    GlobalRef(mod, object.value)
 end
 
 function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr; no_cse=false)
-    if expr.head == :foreigncall
-        ssa_id = expr.args[2]
-        return push_instr!(exprtoir, expr.args[1], expr.type; source_ssa_id=ssa_id)
+    # if expr.head == :foreigncall
+    #     ssa_id = expr.args[2]
+    #     return push_instr!(exprtoir, expr.args[1], expr.type; source_ssa_id=ssa_id)
+    # end
+
+    # method = if expr.mod === nothing
+    #     op
+    # elseif expr.mod isa Unknown
+    #     GlobalRef(exprtoir.mod, Symbol(op))
+    # else
+    #     GlobalRef(eval(expr.mod), Symbol(op))
+    # end
+
+    # if expr.head == :boundscheck
+    #     ssa_id = expr.args[2]
+    #     return push_instr!(exprtoir, expr.args[1], expr.type; source_ssa_id=ssa_id)
+    # end
+
+    @assert expr.head == :call
+
+    args = map(a -> expr_to_ir!(exprtoir, a), arguments(expr))
+
+    op = first(children(expr))
+
+    method = expr_to_ir!(exprtoir, op)
+
+    # method = if expr.mod === nothing
+    #     op
+    # elseif expr.mod isa Unknown
+    #     GlobalRef(exprtoir.mod, Symbol(op))
+    # else
+    #     GlobalRef(eval(expr.mod), Symbol(op))
+    # end
+
+    instruction = Expr(expr.head, method, args...)
+
+    index = findlast(x -> x == instruction, exprtoir.instructions)
+    if index !== nothing && !no_cse
+        return SSAValue(exprtoir.ssa_start + index - 1)
     end
 
-    if expr.head == :boundscheck
-        ssa_id = expr.args[2]
-        return push_instr!(exprtoir, expr.args[1], expr.type; source_ssa_id=ssa_id)
-    end
-
-    if expr.head == :call
-        args = map(a -> expr_to_ir!(exprtoir, a), arguments(expr))
-
-        op = first(children(expr))
-
-        method = if expr.mod === nothing
-            op
-        elseif expr.mod isa Unknown
-            GlobalRef(exprtoir.mod, Symbol(op))
-        else
-            GlobalRef(eval(expr.mod), Symbol(op))
-        end
-
-        instruction = Expr(expr.head, method, args...)
-
-        index = findlast(x -> x == instruction, exprtoir.instructions)
-        if index !== nothing && !no_cse
-            return SSAValue(exprtoir.ssa_start + index - 1)
-        end
-
-        return push_instr!(exprtoir, instruction, expr.type)
-    end
-
-    error("TODO: ", expr.head)
+    return push_instr!(exprtoir, instruction, expr.type)
 end

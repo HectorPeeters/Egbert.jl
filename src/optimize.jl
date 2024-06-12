@@ -34,9 +34,10 @@ function perform_rewrites!(
         irtoexpr = IrToExpr(ir.stmts, block.stmts)
         irexpr = get_root_expr!(irtoexpr)
 
+        dump(irexpr)
+
         # Create an e-graph from the expression tree
-        g = EGraph{IRExpr, Nothing}(irexpr)
-        # settermtype!(g, IRExpr)
+        g = EGraph{IRExpr,Nothing}(irexpr)
 
         # Saturate the e-graph using the rewrite rules defined in the macro call
         sat_result = saturate!(g, interp.rules, interp.options.saturation_params)
@@ -90,9 +91,6 @@ function perform_rewrites!(
         end
     end
 
-    println(sv.src.parent.def)
-    println(ir)
-
     # If any changes were made to the IR, we have to rerun type inference to infer 
     # all new method calls. This also makes them susceptible to inlining later on
     # in the pipeline.
@@ -102,7 +100,7 @@ function perform_rewrites!(
         max_world = typemax(UInt64)
         irstate = CC.IRInterpretationState(interp, method_info, ir, ci.parent, ci.slottypes, world, world, max_world)
 
-       CC.ir_abstract_constant_propagation(interp, irstate)
+        CC.ir_abstract_constant_propagation(interp, irstate)
     end
 
     return ir, made_changes

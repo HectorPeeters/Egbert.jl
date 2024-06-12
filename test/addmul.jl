@@ -44,15 +44,15 @@ end
     C = CustomList([7, 8, 9])
 
     rules = @theory a b c begin
-        add(a, mul(b, c)) --> add_mul(a, b, c)
+        Main.add(a, Main.mul(b, c)) --> Main.add_mul(a, b, c)
     end
 
-    @test (@custom Options() rules optimizetarget(A, B, C)).data == [29, 42, 57]
-    # @test begin
-    #     global performed_mul = false
-    #     @custom Options() rules optimizetarget(A, B, C)
-    #     performed_mul == false
-    # end
+    # @test (@custom Options() rules optimizetarget(A, B, C)).data == [29, 42, 57]
+    @test begin
+        global performed_mul = false
+        @custom Options() rules optimizetarget(A, B, C)
+        performed_mul == false
+    end
 
     # @test (@custom Options() rules nooptimizetarget(A, B)).data == [5, 7, 9]
 end
