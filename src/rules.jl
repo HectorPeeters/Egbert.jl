@@ -58,8 +58,6 @@ bitwise_identities = @theory a b c begin
     band(a, b) --> band(b, a)
     bor(a, b) --> bor(b, a)
     bxor(a, b) --> bxor(b, a)
-
-    # TODO: add the rest
 end
 
 export add, sub, mul, pow
