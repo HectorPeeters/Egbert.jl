@@ -2,7 +2,6 @@ using .Core.Compiler: naive_idoms, IRCode, Argument
 using Metatheory
 using Metatheory.EGraphs: collect_cse!, rec_extract, settermtype!, EGraph
 
-const RewriteRule = Any
 
 """
     perform_rewrites!(ir::IRCode, ci::CC.CodeInfo, rules::Any)

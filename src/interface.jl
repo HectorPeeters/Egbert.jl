@@ -5,11 +5,13 @@ The global cache storing code instances for every compiled method instance.
 """
 const global_ci_cache = CodeCache()
 
+
 """
 A separate cache to store the compiled closures. This almost completely eliminates 
 the overhead of using the custom abstract interpreter.
 """
 const closure_cache = Dict{Tuple{UInt,DataType},OpaqueClosure}()
+
 
 """
     custom(rules, ex::Expr)
@@ -58,6 +60,7 @@ macro custom(options, rules, ex::Expr)
         end
     end
 end
+
 
 """
     custom_compiler(ft, tt, world, options, rules)
