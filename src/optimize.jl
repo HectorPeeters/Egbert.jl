@@ -1,6 +1,6 @@
 using .Core.Compiler: naive_idoms, IRCode, Argument
+using Metatheory.EGraphs
 using Metatheory
-using Metatheory.EGraphs: collect_cse!, rec_extract, settermtype!, EGraph
 
 
 """
@@ -35,12 +35,8 @@ function perform_rewrites!(
         irexpr = get_root_expr!(irtoexpr)
 
         # Create an e-graph from the expression tree
-        g = EGraph(irexpr; keepmeta=true)
-        settermtype!(g, IRExpr)
-
-        # Determine the cost of our starting expression
-        analyze!(g, interp.options.analysis_ref, g.root)
-        cost_before = getfield(g[g.root].data, interp.options.analysis_name).x[2]
+        g = EGraph{IRExpr, Nothing}(irexpr)
+        # settermtype!(g, IRExpr)
 
         # Saturate the e-graph using the rewrite rules defined in the macro call
         sat_result = saturate!(g, interp.rules, interp.options.saturation_params)
@@ -48,17 +44,6 @@ function perform_rewrites!(
         # Print the saturation results when configured
         if interp.options.print_sat_info
             println(sat_result)
-        end
-
-        # Perform e-graph analysis using the specified analysis function
-        analyze!(g, interp.options.analysis_ref, g.root)
-
-        # Determine the cost after saturation
-        cost_after = getfield(g[g.root].data, interp.options.analysis_name).x[2]
-
-        # Print the change in cost when configured
-        if interp.options.print_ast_cost
-            println("AST cost: ", cost_before, " -> ", cost_after)
         end
 
         # Extract the optimal expression based on the analysis function
@@ -105,6 +90,9 @@ function perform_rewrites!(
         end
     end
 
+    println(sv.src.parent.def)
+    println(ir)
+
     # If any changes were made to the IR, we have to rerun type inference to infer 
     # all new method calls. This also makes them susceptible to inlining later on
     # in the pipeline.
@@ -114,7 +102,7 @@ function perform_rewrites!(
         max_world = typemax(UInt64)
         irstate = CC.IRInterpretationState(interp, method_info, ir, ci.parent, ci.slottypes, world, world, max_world)
 
-        CC.ir_abstract_constant_propagation(interp, irstate)
+       CC.ir_abstract_constant_propagation(interp, irstate)
     end
 
     return ir, made_changes

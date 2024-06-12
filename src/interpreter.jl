@@ -47,11 +47,6 @@ struct Options
     """
     log_ir::Bool
 
-    """
-    Whether to print the AST cost before and after every e-graph optimization.
-    """
-    print_ast_cost::Bool
-
     function Options(;
         analysis_ref=astsize,
         analysis_name=:astsize,
@@ -60,8 +55,7 @@ struct Options
         enable_caching=true,
         dont_run=false,
         print_sat_info=false,
-        log_ir=false,
-        print_ast_cost=false
+        log_ir=false
     )
         new(
             analysis_ref,
@@ -71,8 +65,7 @@ struct Options
             enable_caching,
             dont_run,
             print_sat_info,
-            log_ir,
-            print_ast_cost
+            log_ir
         )
     end
 end

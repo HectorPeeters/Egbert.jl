@@ -44,7 +44,7 @@ x = 1:1000
 
 println("Generated expression, running benchmark..")
 
-@test (@custom Options(print_ast_cost=true) math_identities expression()) == expression()
+@test (@custom Options() math_identities expression()) == expression()
 
 default_options = Options(opt_pipeline=Core.Compiler.default_opt_pipeline(), enable_caching=false, dont_run=true)
 opt_options = Options(enable_caching=false, dont_run=true)

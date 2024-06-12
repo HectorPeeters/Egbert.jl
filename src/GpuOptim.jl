@@ -2,6 +2,7 @@ module GpuOptim
 
 include("utils.jl")
 include("cache.jl")
+include("nodes.jl")
 include("irexpr.jl")
 include("interpreter.jl")
 include("optimize.jl")

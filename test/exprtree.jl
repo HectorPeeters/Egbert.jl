@@ -1,4 +1,4 @@
-using GpuOptim: IRExpr, IrToExpr, get_root_expr!, ExprToIr, expr_to_ir!
+using GpuOptim: IRExpr, IrToExpr, get_root_expr!, ExprToIr, expr_to_ir!, Alpha, MetadataAnalysis
 using Test
 using Metatheory
 
@@ -42,7 +42,7 @@ function assert_conversion(expr)
     irtoexpr = IrToExpr(ir.stmts, block.stmts)
     irexpr = get_root_expr!(irtoexpr)
 
-    g = EGraph(irexpr; keepmeta=true)
+    g = EGraph{IRExpr, MetadataAnalysis}(irexpr)
     result = extract!(g, astsize)
 
     exprtoir = ExprToIr(Main, block.stmts)
