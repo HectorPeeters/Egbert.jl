@@ -1,5 +1,5 @@
 using GpuOptim: @custom, @rewritetarget_ef, Options, rules,
-    build_timing_optimization_pipeline, clear_pipeline_timings, print_pipeline_timings, STAGE_TIMES
+    build_timing_pipeline, clear_pipeline_timings, print_pipeline_timings, STAGE_TIMES
 using BenchmarkTools
 
 function fib(n)
@@ -61,7 +61,7 @@ function perform_benchmark(name, func)
     println("Total time per execution: ", total / 1e9)
 end
 
-options = Options(enable_caching=false, dont_run=true, opt_pipeline=build_timing_optimization_pipeline())
+options = Options(enable_caching=false, dont_run=true, opt_pipeline=build_timing_pipeline())
 
 perform_benchmark("fib", () -> @benchmark (@custom options rules fib(20)))
 perform_benchmark("matmul", () -> @benchmark (@custom options rules matmul(10)))

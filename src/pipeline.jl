@@ -177,7 +177,7 @@ pipeline that measures the execution time of the
 three major stages in the pipeline (original pipeline 1,
 rewrite fixed point, and original pipeline 2).
 """
-function build_timing_optimization_pipeline()
+function build_timing_pipeline()
     pm = CC.PassManager()
 
     CC.register_pass!(pm, "standard opt pipeline",
