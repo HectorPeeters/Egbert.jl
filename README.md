@@ -118,3 +118,4 @@ Below is a short list of the limitations of the current implementation:
 
 - No control flow support, only single basic block functions are supported
 - Matching on qualified function names is fully not supported (e.g. `Main.test()` or `Base.(:+)(12, 13)`) in the current Metatheory version. This prevents the usage of the built-in operators (e.g. +, -, *, /). Wrapper functions will have to be used instead.
+- Method modules are not tracked correctly in some cases due to the same reasons as the item above.
