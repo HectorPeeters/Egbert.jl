@@ -243,7 +243,6 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
     end
 
     if e.head == :foreigncall
-        # TODO: evaluate expression inside
         return IRExpr(
             :foreigncall,
             :foreigncall,
@@ -263,7 +262,7 @@ function ir_to_expr!(irtoexpr::IrToExpr, e::Expr, t)
         )
     end
 
-    error("Unknown expression: ", e)
+    error("Expression not supported: ", e.head)
 end
 
 struct ExprToIr
@@ -384,5 +383,5 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr; no_cse=false)
         return push_instr!(exprtoir, instruction, expr.type)
     end
 
-    error("TODO: ", expr.head)
+    error("Expression type not supported: ", expr.head)
 end

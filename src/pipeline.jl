@@ -12,16 +12,8 @@ function logir(ir, _, sv)
         println(ir)
     end
 
-    return ir |> pass_changed
+    return (ir, :log)
 end
-
-
-"""
-    pass_changed(x)
-
-Helper function to indicate that a pass has changed the IR code.
-"""
-pass_changed(x) = (x, true)
 
 
 """
@@ -43,23 +35,15 @@ Register all the required optimization passes for the standard
 optimization pipeline used by the Julia compiler. 
 """
 function register_first_standard_pipeline!(pm::CC.PassManager)
-    # Perform initial conversion to IRCode
-    CC.register_pass!(pm, "slot2reg", CC.slot2reg)
-    CC.register_condpass!(pm, "compact 1", (ir, _, _) ->
-        CC.compact!(ir) |> pass_changed)
+    CC.register_pass!(pm, "slot2reg", CC.slot2reg |> CC.attachsymbol(:slot2reg))
+    CC.register_pass!(pm, "compact 1", CC.compactpass! |> CC.attachsymbol(:compact1))
 
-    # Perform first pass of normal optimization pipeline
-    CC.register_pass!(pm, "inlining", (ir, ci, sv) ->
-        CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds))
-    CC.register_pass!(pm, "compact 2", (ir, _, _) ->
-        CC.compact!(ir) |> pass_changed)
+    CC.register_pass!(pm, "Inlining", CC.inliningpass! |> CC.attachsymbol(:inlining))
+    CC.register_pass!(pm, "compact 2", CC.compactpass! |> CC.attachsymbol(:compact2))
 
-    CC.register_pass!(pm, "SROA", (ir, _, sv) ->
-        CC.sroa_pass!(ir, sv.inlining) |> pass_changed)
-    CC.register_pass!(pm, "ADCE", (ir, _, sv) ->
-        CC.adce_pass!(ir, sv.inlining))
-    CC.register_condpass!(pm, "compact 3", (ir, _, _) ->
-        CC.compact!(ir, true) |> pass_changed)
+    CC.register_pass!(pm, "SROA", CC.sroapass! |> CC.attachsymbol(:sroa))
+    CC.register_pass!(pm, "ADCE", CC.adcepass! |> CC.setsymbol(:adce))
+    CC.register_condpass!(pm, "compact 3", :adce, CC.compactcfgpass! |> CC.attachsymbol(:compact3))
 end
 
 
@@ -72,12 +56,9 @@ is not needed here anymore as that already happens inside the
 fixedpoint loop.
 """
 function register_second_standard_pipeline!(pm::CC.PassManager)
-    CC.register_condpass!(pm, "SROA", (ir, _, sv) ->
-        CC.sroa_pass!(ir, sv.inlining) |> pass_changed)
-    CC.register_condpass!(pm, "ADCE", (ir, _, sv) ->
-        CC.adce_pass!(ir, sv.inlining))
-    CC.register_condpass!(pm, "compact 4", (ir, _, _) ->
-        CC.compact!(ir, true) |> pass_changed)
+    CC.register_pass!(pm, "SROA 2", CC.sroapass! |> CC.attachsymbol(:sroa2))
+    CC.register_pass!(pm, "ADCE 2", CC.adcepass! |> CC.setsymbol(:adce2))
+    CC.register_condpass!(pm, "compact 4", :adce2, CC.compactcfgpass! |> CC.attachsymbol(:compact4))
 end
 
 
@@ -90,23 +71,18 @@ rewriting, followed by an optional compact pass.
 Afterwards it performs the cleanup followed by an
 optional inlining pass and another compact pass.
 """
-function rewrite_fixedpoint_pass(ir, ci, sv)
-    # Perform rewrite optimizations
-    ir, rewrote = perform_rewrites!(ir, ci, sv)
-    if rewrote
-        ir = CC.compact!(ir, true)
-    end
+function rewrite_fixedpoint_pass()
+    pm = CC.PassManager()
 
-    # Clean up calls to wrapper methods
-    ir, cleanedup = cleanup_wrappers!(ir, ci, sv)
+    CC.register_pass!(pm, "rewrite", perform_rewrites! |> CC.setsymbol(:rewrite))
+    CC.register_condpass!(pm, "rewrite compact", :rewrite, CC.compactpass! |> CC.attachsymbol(:rewritecompact1))
 
-    # Perform inlining and compact if we were able to clean up
-    if rewrote || cleanedup
-        ir, _ = CC.ssa_inlining_pass!(ir, sv.inlining, ci.propagate_inbounds)
-        ir = CC.compact!(ir)
-    end
+    CC.register_pass!(pm, "cleanup", cleanup_wrappers! |> CC.setsymbol(:cleanup))
 
-    return ir, (rewrote || cleanedup)
+    CC.register_condpass!(pm, "rewrite inline", [:rewrite, :cleanup], CC.inliningpass! |> CC.attachsymbol(:rewriteinlining))
+    CC.register_condpass!(pm, "compact", [:rewrite, :cleanup], CC.compactpass! |> CC.attachsymbol(:rewritecompact2))
+
+    return pm
 end
 
 
@@ -120,7 +96,8 @@ function build_optimization_pipeline()
     pm = CC.PassManager()
 
     register_first_standard_pipeline!(pm)
-    CC.register_fixedpointpass!(pm, "fixed point", rewrite_fixedpoint_pass)
+    CC.register_fixedpointpass!(pm, "fixed point", [:rewrite, :cleanup],
+        rewrite_fixedpoint_pass())
     register_second_standard_pipeline!(pm)
 
     # Log the result of the optimizations
@@ -131,7 +108,7 @@ function build_optimization_pipeline()
             CC.verify_ir(ir, true, false,
                 CC.optimizer_lattice(sv.inlining.interp))
             CC.verify_linetable(ir.linetable)
-            return ir |> pass_changed
+            return (ir, :verify)
         end)
     end
 
@@ -212,8 +189,22 @@ function build_timing_optimization_pipeline()
         ))
     )
 
+    # This is not the most elegant solution but as a fixedpoint pass does not
+    # take a single pass but a full pass manager, we can't just use the time
+    # wrapper used in the other two parts.
     CC.register_fixedpointpass!(pm, "fixed point",
-        time("fixedpoint", rewrite_fixedpoint_pass))
+        let pm = CC.PassManager()
+            CC.CC.register_pass(pm, "fixed point timing",
+                time("fixedpoint", pass_group(
+                    let pm = CC.PassManager()
+                        CC.register_fixedpointpass!(pm, "fixed point", [:rewrite, :cleanup],
+                            rewrite_fixedpoint_pass())
+                        pm     
+                    end
+                ))
+            )
+        end
+    )
 
     CC.register_pass!(pm, "standard opt pipeline",
         time("default2", pass_group(
@@ -232,7 +223,7 @@ function build_timing_optimization_pipeline()
             CC.verify_ir(ir, true, false,
                 CC.optimizer_lattice(sv.inlining.interp))
             CC.verify_linetable(ir.linetable)
-            return ir |> pass_changed
+            return (ir, :verify)
         end)
     end
 
