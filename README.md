@@ -1,6 +1,11 @@
 # Egbert.jl
 
-Egbert.jl (Equivalence-Graph-Based Expression Rewrite Tool) is an e-graph optimization framework developed for my masters thesis at Ghent University.
+<p><img src="https://upload.wikimedia.org/wikipedia/commons/c/ca/Egbert.jpg" height="150px" align="right" valign="middle" vspace="5" hspace="5"/>
+Egbert.jl (Equivalence-Graph-Based Expression Rewrite Tool) is an optimization framework using e-graphs and equality saturation developed for my masters thesis at Ghent University. It uses a set of rewrite rules to obtain an optimal expression based on some rewrite rules by performing equality saturation.
+
+The optimization process used in this project uses the e-graph implementation found in [Metatheory.jl](https://github.com/JuliaSymbolics/Metatheory.jl/) and lends many ideas and techniques from the [Cranelift](https://github.com/bytecodealliance/wasmtime/blob/main/cranelift/README.md) project.
+</p>
+
 
 ## Running
 
