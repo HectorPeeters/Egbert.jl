@@ -2,6 +2,10 @@ using .Core: MethodInstance, CodeInstance
 
 const CC = Core.Compiler
 
+"""
+Code cache used by the custom abstract interpreter. It stores relations between
+MethodInstances and their corresponding CodeInstances. 
+"""
 struct CodeCache
     dict::IdDict{MethodInstance,Vector{CodeInstance}}
 
@@ -44,25 +48,28 @@ function CC.setindex!(cache::CodeCache, ci::CodeInstance, mi::MethodInstance)
 end
 
 
-## world view of the cache
-
 function CC.haskey(wvc::CC.WorldView{CodeCache}, mi::MethodInstance)
     CC.get(wvc, mi, nothing) !== nothing
 end
 
 function CC.get(wvc::CC.WorldView{CodeCache}, mi::MethodInstance, default)
-    # check the cache
+    # Check if it is present in the cache
     for ci in get!(wvc.cache.dict, mi, CodeInstance[])
-        if ci.min_world <= wvc.worlds.min_world && wvc.worlds.max_world <= ci.max_world
-            # TODO: if (code && (code == jl_nothing || jl_ir_flag_inferred((jl_array_t*)code)))
-            src = if ci.inferred isa Vector{UInt8}
-                ccall(:jl_uncompress_ir, Any, (Any, Ptr{Cvoid}, Any),
-                    mi.def, C_NULL, ci.inferred)
-            else
-                ci.inferred
-            end
-            return ci
+
+        # For ever CodeInstance, filter the ones with a valid world
+        if ci.min_world > wvc.worlds.min_world || wvc.worlds.max_world > ci.max_world
+            continue
         end
+
+        # Uncompress the IR if necessary
+        src = if ci.inferred isa Vector{UInt8}
+            ccall(:jl_uncompress_ir, Any, (Any, Ptr{Cvoid}, Any),
+                mi.def, C_NULL, ci.inferred)
+        else
+            ci.inferred
+        end
+
+        return ci
     end
 
     return default
@@ -75,11 +82,13 @@ function CC.getindex(wvc::CC.WorldView{CodeCache}, mi::MethodInstance)
 end
 
 function CC.setindex!(wvc::CC.WorldView{CodeCache}, ci::CodeInstance, mi::MethodInstance)
+    # Uncompress IR if necessary
     src = if ci.inferred isa Vector{UInt8}
         ccall(:jl_uncompress_ir, Any, (Any, Ptr{Cvoid}, Any),
             mi.def, C_NULL, ci.inferred)
     else
         ci.inferred
     end
+
     CC.setindex!(wvc.cache, ci, mi)
 end
