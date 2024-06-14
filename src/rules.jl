@@ -1,11 +1,19 @@
 using Metatheory
 
+# NOTE: This file contains a set of default rules used throughout the tests and 
+#       benchmarks. Not all rulesets in this file are fully complete.
+
+
 export and, or, not
 @rewritetarget and(a, b)::Bool = a && b
 @rewritetarget or(a, b)::Bool = a || b
 @rewritetarget not(a)::Bool = !a
 
 export logical_identities
+
+"""
+Rules for boolean logic opetions containing and, or, and not.  
+"""
 logical_identities = @theory a b c begin
     and(a, true) --> a
     or(a, false) --> a
@@ -37,6 +45,7 @@ logical_identities = @theory a b c begin
     or(a, not(a)) --> true
 end
 
+
 export band, bor, bnot, bxor, bnot, bnand
 @rewritetarget band(a, b)::Integer = a & b
 @rewritetarget bor(a, b)::Integer = a | b
@@ -46,6 +55,10 @@ export band, bor, bnot, bxor, bnot, bnand
 @rewritetarget bnand(a, b)::Integer = a ⊼ b
 
 export bitwise_identities
+
+"""
+Rules for bitwise boolean opetions containing or, and, not, and xor.
+"""
 bitwise_identities = @theory a b c begin
     bor(a, 0) --> a
     band(a, 0) --> 0
@@ -60,6 +73,7 @@ bitwise_identities = @theory a b c begin
     bxor(a, b) --> bxor(b, a)
 end
 
+
 export add, sub, mul, pow
 @rewritetarget add(a::Integer, b::Integer)::Integer = a + b
 @rewritetarget sub(a::Integer, b::Integer)::Integer = a - b
@@ -68,6 +82,10 @@ export add, sub, mul, pow
 @rewritetarget pow(a::Integer, b::Integer)::Integer = a ^ b
 
 export math_identities
+
+"""
+Rewrite rules for mathemtical operations.    
+"""
 math_identities = @theory a b c begin
     add(a, b) --> add(b, a)
     mul(a, b) --> mul(b, a)

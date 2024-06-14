@@ -71,8 +71,8 @@ function perform_rewrites!(
         (optim_instr, optim_types) = expr_to_ir!(exprtoir, result)
 
         # NOTE: This is not the best way to check for changes. Initially,
-        #       the cost of the expression was determined but this does
-        #       not take into account the CSE functionality.
+        #       the cost of the expression was used but that does not
+        #       take into account the CSE functionality.
         length(optim_instr) == length(block.stmts) && continue
         made_changes = true
 
