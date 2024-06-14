@@ -79,7 +79,7 @@ export add, sub, mul, pow
 @rewritetarget sub(a::Integer, b::Integer)::Integer = a - b
 @rewritetarget mul(a::Integer, b::Integer)::Integer = a * b
 @rewritetarget div(a::Integer, b::Integer)::Integer = a ÷ b
-@rewritetarget pow(a::Integer, b::Integer)::Integer = a ^ b
+@rewritetarget pow(a::Integer, b::Integer)::Integer = a^b
 
 export math_identities
 

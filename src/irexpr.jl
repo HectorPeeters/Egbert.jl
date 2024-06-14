@@ -23,7 +23,7 @@ struct IRExpr
     """
     The head of the expression node. Most of the time this is :call, depicting
     a function call. All the possible values can be found in the following function:
-    
+
         function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr; no_cse=false)
     """
     head::Symbol
@@ -475,12 +475,12 @@ function expr_to_ir!(exprtoir::ExprToIr, expr::IRExpr; no_cse=false)
 
     if expr.head == :foreigncall
         ssa_id = expr.args[2]
-        return push_instr!(exprtoir, expr.args[1], expr.type; source_ssa_id=ssa_id)
+        return push_instr!(exprtoir, expr.args[1], expr.type, ssa_id)
     end
 
     if expr.head == :boundscheck
         ssa_id = expr.args[2]
-        return push_instr!(exprtoir, expr.args[1], expr.type; source_ssa_id=ssa_id)
+        return push_instr!(exprtoir, expr.args[1], expr.type, ssa_id)
     end
 
     if expr.head == :ret

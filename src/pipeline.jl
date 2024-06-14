@@ -197,7 +197,7 @@ function build_timing_pipeline()
             let pm = CC.PassManager()
                 CC.register_fixedpointpass!(pm, "fixed point", [:rewrite, :cleanup],
                     rewrite_fixedpoint_pass())
-                pm     
+                pm
             end
         ))
     )
