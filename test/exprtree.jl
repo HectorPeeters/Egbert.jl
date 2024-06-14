@@ -3,7 +3,7 @@ using Test
 using Metatheory
 
 function instr_equal(a, b)
-    if length(a)  != length(b)
+    if length(a) != length(b)
         println("Lengths differ: ", length(a), " ", length(b))
         println(a)
         println(b)
@@ -11,13 +11,13 @@ function instr_equal(a, b)
     end
 
     for (ai, bi) in zip(a, b)
-        if ai isa Expr && ai.head == :invoke && 
+        if ai isa Expr && ai.head == :invoke &&
            bi isa Expr && bi.head == :call
 
             ai.args[1].def.name == bi.args[1].name && continue
         end
 
-        if ai != bi 
+        if ai != bi
             println("Instructions differ: ")
             println(ai)
             println(bi)
@@ -63,44 +63,44 @@ end
         return x
     end
     combine(a, b) = (a, b)
-    
+
     integer_add(a::Int, b::Int) = a + b
     assert_conversion(integer_add)
-    
+
     broadcast(a) = max.(a)
     assert_conversion(broadcast)
-    
+
     nested(a) = a.b().c.d()
     assert_conversion(nested)
-    
+
     sideeffect() = doeffect()
     assert_conversion(sideeffect)
-    
+
     function multiple_sideeffect()
         doeffect()
         doeffect()
     end
     assert_conversion(multiple_sideeffect)
-    
-    function sideeffect2(a, b) 
+
+    function sideeffect2(a, b)
         x = doeffect2(a)
         y = doeffect2(b)
         return combine(x, y)
     end
     assert_conversion(sideeffect2)
-    
+
     unreachable() = unreachable()
     assert_conversion(unreachable)
-    
+
     callexpr(a, b) = a + b
     assert_conversion(callexpr)
-    
+
     base_func(a) = Base.code_ircode(a)
     assert_conversion(base_func)
-    
+
     apply(a) = a()
     assert_conversion(apply)
-    
+
     closure(a) = () -> a
     assert_conversion(closure)
 
