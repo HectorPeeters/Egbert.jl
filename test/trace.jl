@@ -1,7 +1,7 @@
 # A test rewriting the trace of a matrix multiplication to a more efficient
 # implementation.
 
-using GpuOptim: @custom, @rewritetarget, @rewritetarget_ef, Options
+using GpuOptim: @optimize, @rewritetarget, @rewritetarget_ef, Options
 using Test: @testset, @test
 using LinearAlgebra: diag, sum, transpose
 using BenchmarkTools
@@ -69,11 +69,11 @@ end
 @testset "TraceOfMatMul" begin
     @test isapprox(trace(mul(A, B)), mul_trace_optimized(A, B))
 
-    @test (@custom Options() rules nooptimize1(A)) == trace(A)
-    @test (@custom Options() rules nooptimize2(A, B)) == mul(A, B)
+    @test (@optimize Options() rules nooptimize1(A)) == trace(A)
+    @test (@optimize Options() rules nooptimize2(A, B)) == mul(A, B)
 
     @test begin
-        optimized = @custom Options() rules tooptimize(A, B)
+        optimized = @optimize Options() rules tooptimize(A, B)
         expected = tooptimize(A, B)
         isapprox(optimized, expected)
     end

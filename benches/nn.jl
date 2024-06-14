@@ -1,4 +1,4 @@
-using GpuOptim: @custom, @rewritetarget_ef, Options
+using GpuOptim: @optimize, @rewritetarget_ef, Options
 using Test: @testset, @test
 using LinearAlgebra: sum, transpose, tr
 using LinearAlgebra.BLAS: gemm, gemm!
@@ -82,7 +82,7 @@ for i in range(1000, 3500, step=100)
     I = randn(n, input_dim)
     W, B, BN = init_layer(input_dim, output_dim, n)
 
-    t = @benchmark (@custom Options() rules forward_layer($I, $W, $B))
+    t = @benchmark (@optimize Options() rules forward_layer($I, $W, $B))
     println(t)
     tslow = @benchmark forward_layer_baseline($I, $W, $B)
     println(tslow)

@@ -1,4 +1,4 @@
-using GpuOptim: @custom, @rewritetarget_ef, Options
+using GpuOptim: @optimize, @rewritetarget_ef, Options
 using Test: @testset, @test
 using LinearAlgebra: dot, transpose, tr
 using BenchmarkTools
@@ -47,7 +47,7 @@ for i in range(1, stop=5000, length=30)
     A = rand(n, n)
     B = rand(n, n)
 
-    t = @benchmark (@custom Options() rules tooptimize($A, $B))
+    t = @benchmark (@optimize Options() rules tooptimize($A, $B))
     tslow = @benchmark baseline($A, $B)
 
     push!(xs, n)

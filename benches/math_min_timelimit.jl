@@ -1,4 +1,4 @@
-using GpuOptim: @custom, @rewritetarget, Options, math_identities
+using GpuOptim: @optimize, @rewritetarget, Options, math_identities
 using Test: @testset, @test
 using Metatheory
 using BenchmarkTools: @benchmark
@@ -18,7 +18,7 @@ end
 
 @test tooptimize(12, 13) == 625
 
-@test (@custom Options() math_identities tooptimize(12, 13)) == 625
+@test (@optimize Options() math_identities tooptimize(12, 13)) == 625
 
 for i in 5:35
     println("Iteration ", i, " limit ", i * 100_000, " ns")
@@ -31,5 +31,5 @@ for i in 5:35
         print_sat_info=true
     )
 
-    @custom options math_identities tooptimize(12, 13)
+    @optimize options math_identities tooptimize(12, 13)
 end

@@ -1,4 +1,4 @@
-using GpuOptim: @custom, @rewritetarget, Options, math_identities
+using GpuOptim: @optimize, @rewritetarget, Options, math_identities
 using Test: @testset, @test
 using Metatheory
 using BenchmarkTools: @benchmark, @btime
@@ -44,15 +44,15 @@ x = 1:1000
 
 println("Generated expression, running benchmark..")
 
-@test (@custom Options(print_ast_cost=true) math_identities expression()) == expression()
+@test (@optimize Options(print_ast_cost=true) math_identities expression()) == expression()
 
 default_options = Options(opt_pipeline=Core.Compiler.default_opt_pipeline(), enable_caching=false, dont_run=true)
 opt_options = Options(enable_caching=false, dont_run=true)
 
-@btime (@custom default_options math_identities expression())
-@btime (@custom opt_options math_identities expression())
+@btime (@optimize default_options math_identities expression())
+@btime (@optimize opt_options math_identities expression())
 
-@btime (@custom Options(opt_pipeline=Core.Compiler.default_opt_pipeline()) math_identities expression())
-@btime (@custom Options() math_identities expression())
+@btime (@optimize Options(opt_pipeline=Core.Compiler.default_opt_pipeline()) math_identities expression())
+@btime (@optimize Options() math_identities expression())
 
 println("Done!")

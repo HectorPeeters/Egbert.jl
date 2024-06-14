@@ -1,6 +1,6 @@
 # A simple example of a rewrite test
 
-using GpuOptim: @custom, @rewritetarget, @rewritetarget_ef, Options
+using GpuOptim: @optimize, @rewritetarget, @rewritetarget_ef, Options
 using Test: @testset, @test
 using Metatheory
 
@@ -47,12 +47,12 @@ end
         add(a, mul(b, c)) --> add_mul(a, b, c)
     end
 
-    @test (@custom Options() rules optimizetarget(A, B, C)).data == [29, 42, 57]
+    @test (@optimize Options() rules optimizetarget(A, B, C)).data == [29, 42, 57]
     @test begin
         global performed_mul = false
-        @custom Options() rules optimizetarget(A, B, C)
+        @optimize Options() rules optimizetarget(A, B, C)
         performed_mul == false
     end
 
-    @test (@custom Options() rules nooptimizetarget(A, B)).data == [5, 7, 9]
+    @test (@optimize Options() rules nooptimizetarget(A, B)).data == [5, 7, 9]
 end
