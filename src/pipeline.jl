@@ -120,7 +120,7 @@ end
 A global dictionary used to store execution times and execution
 counts of the major stages of the optimization pipeline.
 """
-const STAGE_TIMES = OrderedDict{String,Tuple{Float64,Int}}()
+const STAGE_TIMES = OrderedDict{Symbol,Tuple{Float64,Int}}()
 
 
 """
@@ -181,7 +181,7 @@ function build_timing_optimization_pipeline()
     pm = CC.PassManager()
 
     CC.register_pass!(pm, "standard opt pipeline",
-        time("default1", pass_group(
+        time(:default1, pass_group(
             let pm = CC.PassManager()
                 register_first_standard_pipeline!(pm)
                 pm
@@ -192,22 +192,18 @@ function build_timing_optimization_pipeline()
     # This is not the most elegant solution but as a fixedpoint pass does not
     # take a single pass but a full pass manager, we can't just use the time
     # wrapper used in the other two parts.
-    CC.register_fixedpointpass!(pm, "fixed point",
-        let pm = CC.PassManager()
-            CC.CC.register_pass(pm, "fixed point timing",
-                time("fixedpoint", pass_group(
-                    let pm = CC.PassManager()
-                        CC.register_fixedpointpass!(pm, "fixed point", [:rewrite, :cleanup],
-                            rewrite_fixedpoint_pass())
-                        pm     
-                    end
-                ))
-            )
-        end
+    CC.register_pass!(pm, "fixed point timing",
+        time(:fixedpoint, pass_group(
+            let pm = CC.PassManager()
+                CC.register_fixedpointpass!(pm, "fixed point", [:rewrite, :cleanup],
+                    rewrite_fixedpoint_pass())
+                pm     
+            end
+        ))
     )
 
     CC.register_pass!(pm, "standard opt pipeline",
-        time("default2", pass_group(
+        time(:default2, pass_group(
             let pm = CC.PassManager()
                 register_second_standard_pipeline!(pm)
                 pm
