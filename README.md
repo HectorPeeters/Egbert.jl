@@ -6,7 +6,7 @@ This repository contains the e-graph optimization framework developed for my mas
 
 Running this optimizer requires a custom build of the Julia compiler. This custom version includes a pass manager which allows for the optimization pipeline to be changed at run time.
 
-This fork of the Julia compiler can be found at [HectorPeeters/julia](https://github.com/HectorPeeters/julia). The required changes are on the `pass-manager` branch, while the original commit (`29a58d5`) from which all changes for the pass manager have been made is marked using the `baseline` tag.
+This fork of the Julia compiler can be found at [HectorPeeters/julia](https://github.com/HectorPeeters/julia). The required changes are on the [pass-manager](https://github.com/HectorPeeters/julia/tree/pass-manager) branch, while the original commit [29a58d5](https://github.com/HectorPeeters/julia/commit/29a58d5c4a5943774984ba83b2a84f98ff377a73) from which all changes for the pass manager have been made is marked using the `baseline` tag.
 
 The normal Julia [build instructions](https://github.com/HectorPeeters/julia/tree/master#building-julia) (i.e. running `make`) should be sufficient for compiling this fork.
 
