@@ -1,6 +1,6 @@
-# TODO - TITLE
+# Egbert.jl
 
-This repository contains the e-graph optimization framework developed for my masters thesis at Ghent University.
+Egbert.jl (Equivalence-Graph-Based Expression Rewrite Tool) is an e-graph optimization framework developed for my masters thesis at Ghent University.
 
 ## Running
 
