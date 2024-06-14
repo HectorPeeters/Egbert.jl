@@ -40,6 +40,7 @@ end
 
 x = 1:1000
 
+# Change input size here
 @gen_expression(256)
 
 println("Generated expression, running benchmark..")
