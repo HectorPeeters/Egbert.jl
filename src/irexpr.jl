@@ -58,7 +58,7 @@ function Base.:(==)(a::IRExpr, b::IRExpr)
     a.head == b.head && a.args == b.args
 end
 
-TermInterface.istree(e::IRExpr) = e.head == :call || e.head == :alpha || e.head == :ret
+TermInterface.istree(e::IRExpr) = e.head == :call || e.head == :alpha || e.head == :ret || e.head == :effect
 TermInterface.operation(e::IRExpr) = e.operation
 TermInterface.exprhead(e::IRExpr) = e.head
 TermInterface.arguments(e::IRExpr) = e.args
