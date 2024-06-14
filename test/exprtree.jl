@@ -1,3 +1,11 @@
+# This testset contains multiple tests verifying the conversion from IR to
+# expression tree and back. It performs the following round trip conversion:
+#
+# IRCode -> IRExpr -> E-Graph -> IRExpr -> IRCode
+#
+# The result should be identical to the original IRCode except for invoke 
+# expressions that could be replaced by a call.
+
 using GpuOptim: IRExpr, IrToExpr, get_root_expr!, ExprToIr, expr_to_ir!
 using Test
 using Metatheory

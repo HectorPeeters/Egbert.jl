@@ -1,4 +1,5 @@
-# Tests showing the common subexpression elimination capabilities
+# This test case is used to ensure that optimization using  common subexpression
+# elimination works correctly and still produces the correct result.
 
 using GpuOptim: @optimize, @rewritetarget_ef, Options
 using Test: @testset, @test
@@ -20,7 +21,10 @@ end
     return MyInt(a.data + b.data)
 end
 
+global count = 0
+
 @rewritetarget_ef function mul(a::MyInt, b::MyInt)::MyInt
+    global count += 1
     return MyInt(a.data * b.data)
 end
 
@@ -38,4 +42,10 @@ end
     @test tooptimize(MyInt(2)) == MyInt(8)
 
     @test (@optimize Options() rules tooptimize(MyInt(2))) == MyInt(8)
+
+    @test begin
+        global count = 0
+        @optimize Options() rules tooptimize(MyInt(2))
+        count == 1
+    end
 end

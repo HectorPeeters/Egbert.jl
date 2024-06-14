@@ -1,4 +1,5 @@
-# A simple example of a rewrite test
+# A simple test case used to test the rewriting using a single rewrite rule
+# with a custom datatype.
 
 using GpuOptim: @optimize, @rewritetarget, @rewritetarget_ef, Options
 using Test: @testset, @test

@@ -1,3 +1,8 @@
+# This test is used to verify the e-graph optimization can correctly find
+# the most optimal form for a mathematical expression with a complex rule order.
+#
+# The expression a^2 + 2ab + b^2 should get rewritten to (a + b)^2
+
 using GpuOptim: @optimize, @rewritetarget, Options, math_identities
 using Test: @testset, @test
 using Metatheory

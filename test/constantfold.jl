@@ -1,18 +1,24 @@
-# Tests showing how constant folding can be implemented using rewrite rules
+# Simple test set to verify the constant folding functionality of the
+# Metatheory.jl library.
 
-using GpuOptim: @optimize, @rewritetarget, Options
+using GpuOptim: @optimize, @rewritetarget_ef, Options
 using Test: @testset, @test
 using Metatheory
 
-@rewritetarget function add(a::Integer, b::Integer)::Integer
+global count = 0;
+
+@rewritetarget_ef function add(a::Integer, b::Integer)::Integer
+    global count += 1
     return a + b
 end
 
-@rewritetarget function mul(a::Integer, b::Integer)::Integer
+@rewritetarget_ef function mul(a::Integer, b::Integer)::Integer
+    global count += 1
     return a * b
 end
 
-@rewritetarget function pow(a::Integer)::Integer
+@rewritetarget_ef function pow(a::Integer)::Integer
+    global count += 1
     return a * a
 end
 
@@ -30,12 +36,15 @@ rules = @theory a b begin
     mul(a, b) == mul(b, a)
 
     # Constant folding rules
-    add(a::Integer, b::Integer) => add(a, b)
-    mul(a::Integer, b::Integer) => mul(a, b)
-    pow(a::Integer) => pow(a)
+    add(a::Integer, b::Integer) => a + b
+    mul(a::Integer, b::Integer) => a * b
+    pow(a::Integer) => a * a
 end
 
 @testset "ConstantFold" begin
     @test tooptimize(12) == 60
+
+    global count = 0
     @test (@optimize Options() rules tooptimize(12)) == 60
+    @test count == 1
 end

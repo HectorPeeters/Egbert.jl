@@ -1,3 +1,6 @@
+# This test set contains multiple tests to verify that side-effects are
+# correctly handled throughout the rewriting process.
+
 using GpuOptim: @optimize, @rewritetarget, @rewritetarget_ef, Options
 using Test: @testset, @test
 using Metatheory
