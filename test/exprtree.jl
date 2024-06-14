@@ -103,4 +103,7 @@ end
     
     closure(a) = () -> a
     assert_conversion(closure)
+
+    arrayindex(a, b) = a[b]
+    assert_conversion(arrayindex)
 end
