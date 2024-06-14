@@ -1,7 +1,7 @@
 # Egbert.jl
 
 <p><img src="https://upload.wikimedia.org/wikipedia/commons/c/ca/Egbert.jpg" height="150px" align="right" valign="middle" vspace="5" hspace="5"/>
-Egbert.jl (Equivalence-Graph-Based Expression Rewrite Tool) is an optimization framework using e-graphs and equality saturation developed for my masters thesis at Ghent University. It uses a set of rewrite rules to obtain an optimal expression based on some rewrite rules by performing equality saturation.
+Egbert.jl (E-Graph-Based Expression Rewrite Tool) is an optimization framework developed for my masters thesis at Ghent University. It uses e-graphs and equality saturation to optimize a function with a set of rewrite rules.
 
 The optimization process used in this project uses the e-graph implementation found in [Metatheory.jl](https://github.com/JuliaSymbolics/Metatheory.jl/) and lends many ideas and techniques from the [Cranelift](https://github.com/bytecodealliance/wasmtime/blob/main/cranelift/README.md) project.
 </p>
@@ -122,5 +122,4 @@ end
 Below is a short list of the limitations of the current implementation:
 
 - No control flow support, only single basic block functions are supported
-- Matching on qualified function names is fully not supported (e.g. `Main.test()` or `Base.(:+)(12, 13)`) in the current Metatheory version. This prevents the usage of the built-in operators (e.g. +, -, *, /). Wrapper functions will have to be used instead.
-- Method modules are not tracked correctly in some cases due to the same reasons as the item above.
+- Matching on qualified function names is fully not supported (e.g. `Main.test()` or `Base.(:+)(12, 13)`) in the current Metatheory version. This prevents the usage of the built-in operators (e.g. +, -, *, /). Wrapper functions will have to be used instead. Patterns containing qualified function names (e.g. `Main.add(a, b) --> Main.add(b, a)`) will not be matched correctly.
