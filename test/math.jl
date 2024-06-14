@@ -1,4 +1,4 @@
-using GpuOptim: @custom, @rewritetarget, Options, math_identities
+using GpuOptim: @optimize, @rewritetarget, Options, math_identities
 using Test: @testset, @test
 using Metatheory
 using BenchmarkTools: @benchmark
@@ -26,6 +26,6 @@ end
 
     @test begin
         global crash_mul = true
-        (@custom Options() math_identities tooptimize(12, 13)) == 625
+        (@optimize Options() math_identities tooptimize(12, 13)) == 625
     end
 end

@@ -14,12 +14,12 @@ const closure_cache = Dict{Tuple{UInt,DataType},OpaqueClosure}()
 
 
 """
-    custom(rules, ex::Expr)
+    optimize(rules, ex::Expr)
 
 Execute a function call using the e-graph optimization pipeline.
 """
 # TODO: this macro should get a better name
-macro custom(options, rules, ex::Expr)
+macro optimize(options, rules, ex::Expr)
     Meta.isexpr(ex, :call) || error("Not a function call")
     f, args... = ex.args
 

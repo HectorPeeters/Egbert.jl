@@ -1,4 +1,4 @@
-using GpuOptim: @custom, @rewritetarget, @rewritetarget_ef, Options
+using GpuOptim: @optimize, @rewritetarget, @rewritetarget_ef, Options
 using Test: @testset, @test
 using Metatheory
 
@@ -58,7 +58,7 @@ end
 
     @test begin
         global check_order = []
-        @custom Options(enable_caching=false) rules tooptimize1()
+        @optimize Options(enable_caching=false) rules tooptimize1()
         check_order == [1, 1]
     end
 
@@ -72,7 +72,7 @@ end
 
     @test begin
         global check_order = []
-        @custom Options() rules tooptimize2(1)
+        @optimize Options() rules tooptimize2(1)
         check_order == [1]
     end
 
@@ -86,7 +86,7 @@ end
 
     @test begin
         global check_order = []
-        @custom Options() rules tooptimize3(1)
+        @optimize Options() rules tooptimize3(1)
         check_order == [1]
     end
 
@@ -100,7 +100,7 @@ end
 
     @test begin
         global check_order = []
-        @custom Options() rules tooptimize4(1)
+        @optimize Options() rules tooptimize4(1)
         check_order == [1]
     end
 
@@ -114,7 +114,7 @@ end
 
     @test begin
         global check_order = []
-        @custom Options() rules tooptimize5(1)
+        @optimize Options() rules tooptimize5(1)
         check_order == [1, 1, 2]
     end
 end

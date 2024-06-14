@@ -1,4 +1,4 @@
-using GpuOptim: @custom, @rewritetarget_ef, Options, rules,
+using GpuOptim: @optimize, @rewritetarget_ef, Options, rules,
     build_timing_pipeline, clear_pipeline_timings, print_pipeline_timings, STAGE_TIMES
 using BenchmarkTools
 
@@ -63,9 +63,9 @@ end
 
 options = Options(enable_caching=false, dont_run=true, opt_pipeline=build_timing_pipeline())
 
-perform_benchmark("fib", () -> @benchmark (@custom options rules fib(20)))
-perform_benchmark("matmul", () -> @benchmark (@custom options rules matmul(10)))
-perform_benchmark("gemm", () -> @benchmark (@custom options rules gemm(rand(10, 10), rand(10, 10), rand(10, 10))))
-perform_benchmark("hanoi", () -> @benchmark (@custom options rules hanoi(10, "A", "B", "C")))
-perform_benchmark("trinom", () -> @benchmark (@custom options rules trinom(12, 13, 14)))
-perform_benchmark("decode", () -> @benchmark (@custom options rules decode([1234, 4321])))
+perform_benchmark("fib", () -> @benchmark (@optimize options rules fib(20)))
+perform_benchmark("matmul", () -> @benchmark (@optimize options rules matmul(10)))
+perform_benchmark("gemm", () -> @benchmark (@optimize options rules gemm(rand(10, 10), rand(10, 10), rand(10, 10))))
+perform_benchmark("hanoi", () -> @benchmark (@optimize options rules hanoi(10, "A", "B", "C")))
+perform_benchmark("trinom", () -> @benchmark (@optimize options rules trinom(12, 13, 14)))
+perform_benchmark("decode", () -> @benchmark (@optimize options rules decode([1234, 4321])))

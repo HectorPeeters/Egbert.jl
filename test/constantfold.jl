@@ -1,6 +1,6 @@
 # Tests showing how constant folding can be implemented using rewrite rules
 
-using GpuOptim: @custom, @rewritetarget, Options
+using GpuOptim: @optimize, @rewritetarget, Options
 using Test: @testset, @test
 using Metatheory
 
@@ -37,5 +37,5 @@ end
 
 @testset "ConstantFold" begin
     @test tooptimize(12) == 60
-    @test (@custom Options() rules tooptimize(12)) == 60
+    @test (@optimize Options() rules tooptimize(12)) == 60
 end

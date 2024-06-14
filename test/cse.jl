@@ -1,6 +1,6 @@
 # Tests showing the common subexpression elimination capabilities
 
-using GpuOptim: @custom, @rewritetarget_ef, Options
+using GpuOptim: @optimize, @rewritetarget_ef, Options
 using Test: @testset, @test
 using LinearAlgebra: diag, sum, transpose
 using BenchmarkTools
@@ -37,5 +37,5 @@ end
 @testset "CommonSubexpressionElimination" begin
     @test tooptimize(MyInt(2)) == MyInt(8)
 
-    @test (@custom Options() rules tooptimize(MyInt(2))) == MyInt(8)
+    @test (@optimize Options() rules tooptimize(MyInt(2))) == MyInt(8)
 end
