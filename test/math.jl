@@ -26,6 +26,8 @@ end
 
     @test begin
         global crash_mul = true
-        (@optimize Options() math_identities tooptimize(12, 13)) == 625
+        result = (@optimize Options() math_identities tooptimize(12, 13)) == 625
+        global crash_mul = false
+        result
     end
 end
