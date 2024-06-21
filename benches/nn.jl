@@ -28,22 +28,22 @@ end
 @rewritetarget_ef addmul_optimizedTT(A::Matrix, B::Matrix, C::Matrix)::Matrix = addmul_optimized(A, B, C, 'T', 'T')
 
 function init_layer(input_dim::Int, output_dim::Int, n::Int)
-    W = randn(input_dim, output_dim)
-    BN = randn(output_dim)'
-    B = repeat(BN, n, 1)
+    W = randn(output_dim, input_dim)
+    BN = randn(output_dim)
+    B = repeat(BN, 1, n)
     return W, B, BN
 end
 
 function forward_layer(I::Matrix, W::Matrix, B::Matrix)
-    return add(mul(I, W), B)
+    return add(mul(W, I), B)
 end
 
 function forward_layer_baseline(I::Matrix, W::Matrix, B::Matrix)
-    return I * W + B
+    return W * I + B
 end
 
 function forward_layer_normal(I, W, B)
-    return I * W .+ B
+    return W * I .+ B
 end
 
 rules = @theory A B C begin
@@ -58,7 +58,7 @@ rules = @theory A B C begin
 
     add(mul(A, B), C) --> addmul_optimizedNN(A, B, C)
     add(mul(transp(A), B), C) --> addmul_optimizedTN(A, B, C)
-    # add(mul(A, transp(B)), C) --> addmul_optimizedNT(A, B, C)
+    add(mul(A, transp(B)), C) --> addmul_optimizedNT(A, B, C)
     add(mul(transp(A), transp(B)), C) --> addmul_optimizedTT(A, B, C)
 
     mul(A, B) --> mul_optimizedNN(A, B)
@@ -72,7 +72,7 @@ ys = Float64[]
 ys_slow = Float64[]
 ys_normal = Float64[]
 
-for i in range(1000, 3500, step=100)
+for i in range(0, 1000, step=20)
     n = i
     input_dim = n
     output_dim = 2 * n
@@ -81,6 +81,10 @@ for i in range(1000, 3500, step=100)
 
     I = randn(n, input_dim)
     W, B, BN = init_layer(input_dim, output_dim, n)
+
+    expected = forward_layer_normal(I, W, BN)
+    @test expected == forward_layer_baseline(I, W, B)
+    @test expected == forward_layer(I, W, B)
 
     t = @benchmark (@optimize Options() rules forward_layer($I, $W, $B))
     println(t)
